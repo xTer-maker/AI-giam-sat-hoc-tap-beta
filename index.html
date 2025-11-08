@@ -3,18 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Ghi Màn Hình & Chụp Ghi Chú Học Tập</title>
+    <title>Công Cụ Ghi Màn Hình Học Tập</title>
     <!-- Tải Tailwind CSS để tạo giao diện đẹp và responsive -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* Cấu hình cơ bản cho chế độ sáng/tối */
+        :root {
+            --bg-body: #f7fafc;
+            --bg-card: #ffffff;
+            --text-primary: #1a202c;
+            --border-color: #e2e8f0;
+        }
+
+        .dark {
+            --bg-body: #1a202c;
+            --bg-card: #2d3748;
+            --text-primary: #ffffff;
+            --border-color: #4a5568;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7fafc;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
         }
         .container {
             max-width: 1000px;
             margin: 0 auto;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
         }
         /* Ẩn video element ban đầu */
         #screenPreview {
@@ -38,26 +58,57 @@
             position: absolute;
             top: 8px;
             right: 8px;
-            opacity: 0.8;
+            opacity: 0.9;
         }
         .delete-btn:hover {
             opacity: 1;
+        }
+        #transcriptPanel {
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
         }
     </style>
 </head>
 <body class="p-4 sm:p-8">
 
-    <div class="container bg-white p-6 rounded-xl shadow-2xl border border-gray-100">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">
-            Công Cụ Ghi Màn Hình Học Tập
-        </h1>
-        <p class="text-gray-600 mb-6">
+    <div class="container p-6 rounded-xl shadow-2xl">
+        
+        <!-- HEADER VÀ CHẾ ĐỘ SÁNG/TỐI -->
+        <div class="flex justify-between items-center mb-6 border-b pb-4">
+            <h1 class="text-3xl font-bold">
+                Công Cụ Ghi Màn Hình Học Tập
+            </h1>
+            <button id="themeToggleButton" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 transition-colors">
+                <!-- Icon Mặt Trời -->
+                <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Icon Mặt Trăng -->
+                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+        </div>
+
+        <p class="text-gray-600 dark:text-gray-400 mb-6">
             Chọn màn hình để chia sẻ và bắt đầu ghi lại. Ảnh chụp ghi chú sẽ được lưu trữ tự động.
         </p>
 
         <!-- Thông báo Trạng thái -->
-        <div id="statusMessage" class="mb-4 p-3 text-sm rounded-lg text-blue-800 bg-blue-50 hidden">
+        <div id="statusMessage" class="mb-4 p-3 text-sm rounded-lg hidden">
             Đang chờ bạn bắt đầu giám sát...
+        </div>
+
+        <!-- THÔNG TIN HỌC SINH -->
+        <div class="mb-6 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <label for="studentName" class="block text-sm font-medium mb-2">
+                Tên Học Sinh Của Bạn (Để báo động):
+            </label>
+            <input type="text" id="studentName" placeholder="Ví dụ: Nguyễn Văn A" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" />
+            <p class="mt-2 text-xs text-red-500">
+                LƯU Ý: Tính năng AI báo động khi giáo viên gọi tên (dựa trên giọng nói) **đã được kích hoạt**. Vui lòng nhập tên đúng.
+            </p>
         </div>
 
         <!-- Vùng Xem Trước & Canvas Ẩn -->
@@ -72,15 +123,27 @@
             </div>
         </div>
 
+        <!-- KHU VỰC PHIÊN MÃ GIỌNG NÓI (SIMULATION) -->
+        <div class="mb-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold mb-2 text-indigo-600 dark:text-indigo-400">
+                🎙️ Phiên Mã Giọng Nói Giáo Viên (Live Transcript)
+            </h3>
+            <div id="transcriptPanel" class="text-sm p-2 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 min-h-[50px]">
+                Đang chờ Bắt Đầu Phiên Mã...
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                **Đã kích hoạt chức năng TỰ ĐỘNG CHỤP** khi phát hiện lệnh "chép bài" hoặc "ghi chép" (Cooldown 5s).
+            </p>
+        </div>
+        
         <!-- Khu vực Điều khiển -->
         <div class="flex flex-wrap gap-4 mb-8 justify-center">
             <button id="startButton" class="btn-primary px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
                 <span class="mr-2">▶️</span> Bắt Đầu Giám Sát
             </button>
             
-            <!-- Nút mô phỏng AI chụp màn hình khi có lệnh "Chép bài" -->
             <button id="screenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-gray-900 rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
-                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Ghi Chú)
+                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Thủ Công - Phím 'S')
             </button>
             
             <button id="stopButton" class="btn-primary px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:opacity-50" disabled>
@@ -93,7 +156,7 @@
         </div>
 
         <!-- Khu vực Hiển thị Ảnh Chụp -->
-        <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">
+        <h2 class="text-2xl font-semibold mb-4 border-b pb-2">
             Ảnh Chụp Ghi Chú Đã Lưu (Lưu Trữ Vĩnh Viễn)
         </h2>
         <div id="screenshotsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -105,15 +168,15 @@
             </p>
         </div>
 
-        <div class="mt-8 pt-4 border-t text-sm text-gray-500">
+        <div class="mt-8 pt-4 border-t text-sm text-gray-500 dark:text-gray-400">
             <p>
-                *Lưu ý: Dữ liệu ảnh chụp của bạn (Ghi Chú) hiện được lưu trữ an toàn trong Firestore Database. Video ghi lại vẫn là dữ liệu phiên (session data).
+                *Lưu ý: Dữ liệu ảnh chụp (Ghi Chú) đã được lưu trữ an toàn trong Firestore Database. Video ghi lại vẫn là dữ liệu phiên (session data) do giới hạn kích thước.
             </p>
             <p>
-                **ID Người Dùng Hiện Tại (để lưu dữ liệu):** <span id="currentUserId" class="font-mono text-xs bg-gray-100 p-1 rounded">Đang tải...</span>
+                **ID Người Dùng Hiện Tại (để lưu dữ liệu):** <span id="currentUserId" class="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-1 rounded">Đang tải...</span>
             </p>
             <p>
-                **Mẹo: Bạn có thể nhấn phím **'S'** để chụp màn hình nhanh thay vì nhấn nút.
+                **Mẹo: Bạn vẫn có thể nhấn phím **'S'** để chụp thủ công bất cứ lúc nào.
             </p>
         </div>
     </div>
@@ -121,7 +184,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, orderBy, addDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, query, addDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Cấu hình Firebase MANDATORY ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -133,16 +196,20 @@
         let userId = null;
         let isAuthReady = false;
 
-        // Bật logging để gỡ lỗi
         setLogLevel('Debug');
         
-        // Khai báo các biến toàn cục cho chức năng ghi hình
+        // --- Biến Toàn Cục Chức Năng ---
         let screenStream = null;
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
+        let recognition = null; // Đối tượng Nhận dạng Giọng nói
         
-        // Lấy các phần tử DOM
+        // Biến Debounce cho chức năng Tự động Chụp
+        let lastAutoScreenshotTime = 0;
+        const AUTO_SCREENSHOT_COOLDOWN = 5000; // 5 giây cooldown sau mỗi lần tự chụp
+
+        // --- Lấy các phần tử DOM ---
         const statusMessage = document.getElementById('statusMessage');
         const screenPreview = document.getElementById('screenPreview');
         const noStreamMessage = document.getElementById('noStreamMessage');
@@ -151,24 +218,164 @@
         const noScreenshotsMessage = document.getElementById('noScreenshotsMessage');
         const loadingMessage = document.getElementById('loadingMessage');
         const currentUserIdElement = document.getElementById('currentUserId');
+        const themeToggleButton = document.getElementById('themeToggleButton');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+        const transcriptPanel = document.getElementById('transcriptPanel');
+        const studentNameInput = document.getElementById('studentName');
+
 
         const startButton = document.getElementById('startButton');
         const stopButton = document.getElementById('stopButton');
         const screenshotButton = document.getElementById('screenshotButton');
         const downloadRecordingButton = document.getElementById('downloadRecordingButton');
 
-        // --- Chức năng Firebase ---
+        // --- CHỨC NĂNG SÁNG / TỐI ---
+        function initializeTheme() {
+            // Kiểm tra localStorage, mặc định là sáng
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            if (isDark) {
+                localStorage.setItem('theme', 'dark');
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            } else {
+                localStorage.setItem('theme', 'light');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
         
-        /**
-         * Khởi tạo Firebase và Xác thực người dùng
-         */
+        // --- CHỨC NĂNG NHẬN DẠNG GIỌNG NÓI ---
+        function startSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                transcriptPanel.innerHTML = '<span class="text-red-500">Trình duyệt không hỗ trợ API Nhận dạng Giọng nói.</span>';
+                return;
+            }
+
+            // Dùng webkitSpeechRecognition cho Chrome hoặc SpeechRecognition tiêu chuẩn
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+
+            recognition.continuous = true; // Liên tục
+            recognition.interimResults = true; // Kết quả tạm thời
+            recognition.lang = 'vi-VN'; // Cài đặt ngôn ngữ Tiếng Việt
+
+            let finalTranscript = '';
+
+            recognition.onstart = () => {
+                transcriptPanel.innerHTML = '<span class="text-indigo-500">Đang lắng nghe...</span>';
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Lỗi Nhận dạng Giọng nói:', event.error);
+                if (event.error !== 'no-speech') {
+                    transcriptPanel.innerHTML = `<span class="text-red-500">Lỗi Nhận dạng Giọng nói: ${event.error}</span>`;
+                }
+            };
+
+            recognition.onend = () => {
+                if (isRecording) {
+                    // Nếu vẫn đang ghi hình, tự động khởi động lại để duy trì phiên lắng nghe liên tục
+                    recognition.start();
+                } else {
+                    transcriptPanel.innerHTML = 'Đã dừng Phiên mã Giọng nói.';
+                }
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + '. ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                // Hiển thị kết quả cuối cùng + kết quả tạm thời
+                transcriptPanel.textContent = finalTranscript + interimTranscript + '...';
+                
+                // MÔ PHỎNG KIỂM TRA LỆNH CHÉP BÀI VÀ GỌI TÊN
+                const currentText = (finalTranscript + interimTranscript).toLowerCase();
+                
+                // --- MÔ PHỎNG BÁO ĐỘNG GỌI TÊN ---
+                const studentName = studentNameInput.value.toLowerCase().trim();
+                if (studentName && currentText.includes(studentName)) {
+                     // Sử dụng style flash đơn giản để báo động
+                     studentNameInput.classList.add('bg-red-200', 'animate-pulse');
+                     setTimeout(() => {
+                        studentNameInput.classList.remove('bg-red-200', 'animate-pulse');
+                     }, 1500);
+                     updateStatus(`GIÁO VIÊN VỪA GỌI TÊN BẠN (${studentNameInput.value})!`, 'error');
+                }
+                
+                // --- TỰ ĐỘNG CHỤP MÀN HÌNH THEO GIỌNG NÓI ---
+                const isCopyCommand = currentText.includes('chép bài') || currentText.includes('ghi chép');
+                const now = Date.now();
+
+                if (isCopyCommand && (now - lastAutoScreenshotTime > AUTO_SCREENSHOT_COOLDOWN) && !screenshotButton.disabled) {
+                    // 1. Cập nhật thời gian cooldown
+                    lastAutoScreenshotTime = now;
+                    
+                    // 2. Kích hoạt chụp màn hình
+                    takeScreenshot();
+                    
+                    // 3. Cập nhật trạng thái
+                    updateStatus(`[AUTO] Đã phát hiện lệnh "CHÉP BÀI" và TỰ ĐỘNG chụp màn hình.`, 'success');
+
+                    // 4. Hiệu ứng phản hồi (Flash màu xanh lá cây)
+                    screenshotButton.classList.remove('bg-yellow-500', 'text-gray-900'); 
+                    screenshotButton.classList.add('animate-pulse', 'bg-green-500', 'text-white'); 
+                    
+                    setTimeout(() => {
+                        screenshotButton.classList.remove('animate-pulse', 'bg-green-500', 'text-white');
+                        // Khôi phục màu vàng ban đầu
+                        screenshotButton.classList.add('bg-yellow-500', 'text-gray-900'); 
+                    }, 500);
+
+                } else if (isCopyCommand) {
+                     // Nếu đang trong thời gian cooldown, chỉ hiển thị cảnh báo
+                     const remaining = Math.ceil((AUTO_SCREENSHOT_COOLDOWN - (now - lastAutoScreenshotTime)) / 1000);
+                     updateStatus(`Đã phát hiện lệnh "CHÉP BÀI" (Đang đợi Cooldown ${remaining}s)...`, 'info');
+                     // Vẫn giữ hiệu ứng nhấp nháy nhẹ để người dùng biết lệnh được nhận
+                     screenshotButton.classList.add('ring-4', 'ring-yellow-500/50');
+                     setTimeout(() => {
+                        screenshotButton.classList.remove('ring-4', 'ring-yellow-500/50');
+                     }, 1000);
+                }
+            };
+
+            // Bắt đầu
+            recognition.start();
+        }
+
+        function stopSpeechRecognition() {
+            if (recognition) {
+                recognition.stop();
+                transcriptPanel.innerHTML = 'Đã dừng Phiên mã Giọng nói.';
+            }
+        }
+        
+        // --- CHỨC NĂNG FIREBASE ---
         async function initializeFirebase() {
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // Xác thực người dùng
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
@@ -181,14 +388,12 @@
                         currentUserIdElement.textContent = userId;
                         isAuthReady = true;
                         updateStatus('Đã kết nối với hệ thống lưu trữ. Sẵn sàng học tập!', 'success');
-                        // Bắt đầu lắng nghe dữ liệu sau khi xác thực xong
                         loadScreenshotsFromFirestore();
                     } else {
-                        userId = crypto.randomUUID(); // Fallback cho trường hợp ẩn danh
+                        userId = crypto.randomUUID();
                         currentUserIdElement.textContent = "Ẩn danh - " + userId.substring(0, 8) + '...';
                         isAuthReady = true;
                         loadScreenshotsFromFirestore();
-                        // Dù là ẩn danh, vẫn có thể thử lưu trữ theo userId ngẫu nhiên (dành cho phiên hiện tại)
                     }
                 });
 
@@ -198,18 +403,11 @@
             }
         }
 
-        /**
-         * Đường dẫn Collection đến ảnh chụp của người dùng hiện tại
-         */
         function getCollectionPath() {
             if (!userId) return null;
-            // Dùng cấu trúc private data: /artifacts/{appId}/users/{userId}/screenshots
             return `artifacts/${appId}/users/${userId}/screenshots`;
         }
 
-        /**
-         * Tải và lắng nghe ảnh chụp từ Firestore
-         */
         function loadScreenshotsFromFirestore() {
             if (!isAuthReady || !db || !userId) return;
 
@@ -217,7 +415,6 @@
             if (!path) return;
             
             const screenshotsCollection = collection(db, path);
-            // Lắng nghe theo thời gian tạo (tuy nhiên không dùng orderBy để tránh lỗi index)
             const q = query(screenshotsCollection); 
 
             onSnapshot(q, (snapshot) => {
@@ -229,7 +426,6 @@
                     });
                 });
                 
-                // Sắp xếp thủ công bằng JavaScript theo timestamp (mới nhất lên trước)
                 loadedScreenshots.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
 
                 renderScreenshots(loadedScreenshots);
@@ -239,10 +435,6 @@
             });
         }
 
-        /**
-         * Lưu ảnh chụp mới vào Firestore
-         * @param {string} dataUrl - Dữ liệu base64 của ảnh
-         */
         async function saveScreenshotToFirestore(dataUrl) {
             if (!isAuthReady || !db || !userId) {
                 updateStatus('Lỗi: Chưa kết nối hệ thống lưu trữ.', 'error');
@@ -253,23 +445,17 @@
             if (!path) return;
 
             try {
-                // Lưu trữ dữ liệu: Base64 URL, thời gian tạo
                 await addDoc(collection(db, path), {
                     imageData: dataUrl,
                     timestamp: new Date(),
                 });
-                updateStatus('Đã lưu ghi chú vào Database thành công!', 'info');
-
+                // status được cập nhật bởi onSnapshot
             } catch (error) {
                 console.error("Lỗi khi lưu ảnh chụp:", error);
                 updateStatus('Lỗi khi lưu ghi chú vào Database.', 'error');
             }
         }
         
-        /**
-         * Xóa ảnh chụp khỏi Firestore
-         * @param {string} screenshotId - ID Document của ảnh chụp
-         */
         async function deleteScreenshotFromFirestore(screenshotId) {
             if (!isAuthReady || !db || !userId) return;
 
@@ -288,28 +474,27 @@
 
         // --- Chức năng Giao diện & Ghi hình ---
 
-        /**
-         * Hàm cập nhật trạng thái giao diện người dùng
-         */
         function updateStatus(message, type = 'info') {
             statusMessage.textContent = message;
             statusMessage.classList.remove('hidden', 'text-blue-800', 'bg-blue-50', 'text-red-800', 'bg-red-50', 'text-green-800', 'bg-green-50');
             
+            // Xóa tất cả các lớp Tailwind cho màu sắc/nền
+            statusMessage.className = 'mb-4 p-3 text-sm rounded-lg';
+
             if (type === 'info') {
-                statusMessage.classList.add('text-blue-800', 'bg-blue-50');
+                statusMessage.classList.add('text-blue-800', 'bg-blue-100', 'dark:text-blue-200', 'dark:bg-blue-900');
             } else if (type === 'success') {
-                statusMessage.classList.add('text-green-800', 'bg-green-50');
+                statusMessage.classList.add('text-green-800', 'bg-green-100', 'dark:text-green-200', 'dark:bg-green-900');
             } else if (type === 'error') {
-                statusMessage.classList.add('text-red-800', 'bg-red-50');
+                statusMessage.classList.add('text-red-800', 'bg-red-100', 'dark:text-red-200', 'dark:bg-red-900');
             }
+            statusMessage.classList.remove('hidden');
         }
 
-        /**
-         * Bắt đầu giám sát (chia sẻ màn hình và ghi video)
-         */
         async function startMonitoring() {
-            updateStatus('Đang yêu cầu quyền chia sẻ màn hình...', 'info');
+            updateStatus('Đang yêu cầu quyền chia sẻ màn hình và microphone...', 'info');
             try {
+                // Yêu cầu cả video và audio (cho microphone để nhận dạng giọng nói)
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 
                 if (!screenStream) {
@@ -331,6 +516,7 @@
 
                 mediaRecorder.onstop = () => {
                     isRecording = false;
+                    stopSpeechRecognition();
                     updateStatus('Hoàn thành ghi màn hình. Sẵn sàng để tải xuống.', 'success');
                     downloadRecordingButton.disabled = false;
                     startButton.disabled = false;
@@ -345,8 +531,11 @@
                 if (track) {
                     track.onended = stopMonitoring;
                 }
+                
+                // Bắt đầu nhận dạng giọng nói
+                startSpeechRecognition();
 
-                updateStatus('Đang Giám Sát và Ghi Hình. Bấm "Chụp Màn Hình Ngay" để lưu ghi chú.', 'success');
+                updateStatus('Đang Giám Sát và Ghi Hình. Tự động chụp khi nghe lệnh "chép bài".', 'success');
                 startButton.disabled = true;
                 stopButton.disabled = false;
                 screenshotButton.disabled = false;
@@ -358,9 +547,6 @@
             }
         }
 
-        /**
-         * Dừng giám sát (dừng chia sẻ màn hình và ghi video)
-         */
         function stopMonitoring() {
             if (screenStream) {
                 screenStream.getTracks().forEach(track => track.stop());
@@ -372,14 +558,13 @@
                 resetState();
             }
             
+            stopSpeechRecognition(); // Dừng nhận dạng giọng nói
+            
             screenPreview.style.display = 'none';
             screenPreview.srcObject = null;
             noStreamMessage.classList.remove('hidden');
         }
 
-        /**
-         * Thiết lập lại trạng thái giao diện và biến
-         */
         function resetState() {
             isRecording = false;
             startButton.disabled = false;
@@ -388,9 +573,6 @@
             updateStatus('Đã dừng giám sát. Vui lòng nhấn "Bắt Đầu" để học buổi mới.', 'info');
         }
 
-        /**
-         * Chụp một khung hình từ luồng video đang chạy và lưu vào Firestore
-         */
         function takeScreenshot() {
             if (!screenStream) {
                 updateStatus('Lỗi: Bạn chưa bắt đầu chia sẻ màn hình.', 'error');
@@ -413,13 +595,10 @@
 
             const imageDataUrl = canvas.toDataURL('image/png');
             
-            // LƯU VÀO FIRESTORE để đảm bảo tính lâu dài
+            // LƯU VÀO FIRESTORE
             saveScreenshotToFirestore(imageDataUrl);
         }
 
-        /**
-         * Hiển thị danh sách ảnh chụp từ Firestore
-         */
         function renderScreenshots(screenshots) {
             screenshotsContainer.innerHTML = ''; // Xóa nội dung cũ
             loadingMessage.classList.add('hidden');
@@ -436,18 +615,18 @@
                 const dateString = now.toLocaleDateString('vi-VN');
                 
                 const card = document.createElement('div');
-                card.className = 'screenshot-card bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300';
+                card.className = 'screenshot-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300 border border-gray-100 dark:border-gray-700';
                 card.innerHTML = `
                     <button class="delete-btn p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition duration-150" data-id="${item.id}" aria-label="Xóa ảnh chụp">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
-                    <img src="${item.imageData}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b">
+                    <img src="${item.imageData}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b dark:opacity-90">
                     <div class="p-3">
-                        <p class="text-xs font-medium text-indigo-600">Ghi chú: ${dateString} ${timeString}</p>
+                        <p class="text-xs font-medium text-indigo-600 dark:text-indigo-400">Ghi chú: ${dateString} ${timeString}</p>
                         <a href="${item.imageData}" download="GhiChu_${item.id}.png" 
-                           class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 font-semibold transition duration-150">
+                           class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 font-semibold transition duration-150">
                             Tải Xuống (PNG)
                         </a>
                     </div>
@@ -455,7 +634,6 @@
                 screenshotsContainer.appendChild(card);
             });
             
-            // Thêm lắng nghe sự kiện xóa sau khi render
             screenshotsContainer.querySelectorAll('.delete-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const id = e.currentTarget.dataset.id;
@@ -466,10 +644,6 @@
             });
         }
 
-
-        /**
-         * Tải xuống video đã ghi lại (Không lưu vào DB do kích thước)
-         */
         function downloadRecording() {
             if (recordedChunks.length === 0) {
                 updateStatus('Không có dữ liệu video để tải xuống.', 'error');
@@ -494,6 +668,10 @@
 
         // --- Thiết lập sự kiện và Khởi tạo ---
         window.onload = function() {
+            // 0. Khởi tạo Chủ đề
+            initializeTheme();
+            themeToggleButton.addEventListener('click', toggleTheme);
+
             // 1. Khởi tạo Firebase
             initializeFirebase();
             
@@ -509,9 +687,9 @@
                     if (!screenshotButton.disabled) {
                          event.preventDefault();
                          takeScreenshot();
-                         screenshotButton.classList.add('animate-pulse');
+                         screenshotButton.classList.add('animate-pulse', 'bg-yellow-600');
                          setTimeout(() => {
-                             screenshotButton.classList.remove('animate-pulse');
+                             screenshotButton.classList.remove('animate-pulse', 'bg-yellow-600');
                          }, 200);
                     }
                 }
