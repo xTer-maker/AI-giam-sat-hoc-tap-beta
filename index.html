@@ -110,6 +110,40 @@
         .dark .message-timestamp {
             color: #a0aec0;
         }
+        /* Hiệu ứng khi có ảnh dán */
+        #chatTextInput.has-pasted-image {
+             border-color: #10b981; /* Màu xanh lá cây */
+             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.5); 
+        }
+
+        /* Tùy chỉnh bố cục nút điều khiển */
+        .control-grid {
+            display: grid;
+            gap: 1rem;
+            /* Bố cục cho mobile */
+            grid-template-areas: 
+                "start"
+                "screenshot"
+                "stop"
+                "download";
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 640px) { /* sm breakpoint */
+            .control-grid {
+                 /* Bố cục cho tablet/desktop: Nút Start chiếm hàng đầu, 3 nút còn lại ở hàng dưới */
+                grid-template-areas: 
+                    "start start start"
+                    "screenshot stop download";
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+        }
+        /* Định vị các nút trong Grid */
+        #startButton { grid-area: start; }
+        #screenshotButton { grid-area: screenshot; }
+        #stopButton { grid-area: stop; }
+        #downloadRecordingButton { grid-area: download; }
+
     </style>
 </head>
 <body class="p-4 sm:p-8">
@@ -164,6 +198,26 @@
                 Chọn "Bắt Đầu" để chọn màn hình cần chia sẻ.
             </div>
         </div>
+        
+        <!-- Khu vực Điều khiển (ĐÃ THAY ĐỔI VỊ TRÍ) -->
+        <div class="control-grid mb-8 border-t pt-6">
+            <button id="startButton" class="btn-primary px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                <span class="mr-2">▶️</span> Bắt Đầu Giám Sát
+            </button>
+            
+            <button id="screenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-gray-900 rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
+                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Thủ Công - Phím 'S')
+            </button>
+            
+            <button id="stopButton" class="btn-primary px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:opacity-50" disabled>
+                <span class="mr-2">🛑</span> Dừng & Hoàn Thành
+            </button>
+            
+            <button id="downloadRecordingButton" class="btn-primary px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50" disabled>
+                <span class="mr-2">⬇️</span> Tải Video Ghi Lại
+            </button>
+        </div>
+
 
         <!-- KHU VỰC PHIÊN MÃ GIỌNG NÓI (SIMULATION) -->
         <div class="mb-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
@@ -185,20 +239,21 @@
             </h2>
             
             <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
-                Nhập câu hỏi, hoặc bấm <span class="font-bold">"Gửi Kèm Ảnh"</span> để gửi ảnh chụp màn hình hiện tại cho AI phân tích.
+                Nhập câu hỏi, và <span class="font-bold">Ctrl+V (hoặc dán) ảnh chụp màn hình</span> vào ô bên dưới để gửi cho AI phân tích.
             </p>
 
             <!-- Khung hiển thị Chat -->
             <div id="chatOutput" class="h-80 mb-3 flex flex-col space-y-3">
                 <div class="ai-message mr-auto">
-                    Chào bạn! Hãy hỏi tôi bất kỳ điều gì về nội dung đang học.
+                    Chào bạn! Hãy hỏi tôi bất kỳ điều gì về nội dung đang học. Bạn cũng có thể dán ảnh chụp màn hình vào ô chat để tôi phân tích nhé.
                     <p class="message-timestamp">AI - ${new Date().toLocaleTimeString('vi-VN')}</p>
                 </div>
             </div>
 
             <!-- Khu vực Nhập Chat -->
+            <!-- Thêm placeholder cho ảnh dán -->
             <div class="flex items-center space-x-2">
-                <input type="text" id="chatTextInput" placeholder="Nhập câu hỏi của bạn..." 
+                <input type="text" id="chatTextInput" placeholder="Nhập câu hỏi của bạn (hoặc Ctrl+V để dán ảnh)..." 
                     class="flex-grow p-3 border border-purple-400 dark:border-purple-600 rounded-lg focus:ring-purple-500 focus:border-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" />
                 
                 <button id="sendQueryButton" class="btn-primary flex items-center justify-center p-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50">
@@ -207,31 +262,13 @@
                     </svg>
                 </button>
             </div>
-            
-            <button id="sendScreenshotButton" class="btn-primary w-full mt-2 px-4 py-2 bg-purple-400 text-purple-900 rounded-lg font-semibold hover:bg-purple-500 disabled:opacity-50 text-sm" disabled>
-                <span class="mr-1">📸</span> Gửi Kèm Ảnh Màn Hình (Tùy chọn)
-            </button>
+            <!-- Đã XÓA nút Gửi Kèm Ảnh -->
+            <p id="pasteStatus" class="mt-2 text-sm text-green-600 dark:text-green-400 hidden">
+                 📸 Đã phát hiện ảnh dán. Bấm Gửi để AI phân tích!
+            </p>
         </div>
         
-        <!-- Khu vực Điều khiển -->
-        <div class="flex flex-wrap gap-4 mb-8 justify-center border-t pt-6">
-            <button id="startButton" class="btn-primary px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
-                <span class="mr-2">▶️</span> Bắt Đầu Giám Sát
-            </button>
-            
-            <button id="screenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-gray-900 rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
-                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Thủ Công - Phím 'S')
-            </button>
-            
-            <button id="stopButton" class="btn-primary px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:opacity-50" disabled>
-                <span class="mr-2">🛑</span> Dừng & Hoàn Thành
-            </button>
-            
-            <button id="downloadRecordingButton" class="btn-primary px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50" disabled>
-                <span class="mr-2">⬇️</span> Tải Video Ghi Lại
-            </button>
-        </div>
-
+        
         <!-- Khu vực Hiển thị Ảnh Chụp -->
         <h2 class="text-2xl font-semibold mb-4 border-b pb-2">
             Ảnh Chụp Ghi Chú Đã Lưu (Lưu Trữ Vĩnh Viễn)
@@ -283,6 +320,9 @@
         let lastAutoScreenshotTime = 0;
         const AUTO_SCREENSHOT_COOLDOWN = 5000; // 5 giây cooldown sau mỗi lần tự chụp
 
+        // Biến lưu trữ ảnh dán/chụp màn hình để gửi AI
+        let pendingImageBase64 = null; 
+
         // --- Lấy các phần tử DOM ---
         const statusMessage = document.getElementById('statusMessage');
         const screenPreview = document.getElementById('screenPreview');
@@ -302,7 +342,14 @@
         const chatOutput = document.getElementById('chatOutput');
         const chatTextInput = document.getElementById('chatTextInput');
         const sendQueryButton = document.getElementById('sendQueryButton');
-        const sendScreenshotButton = document.getElementById('sendScreenshotButton');
+        const pasteStatus = document.getElementById('pasteStatus');
+        
+        // Các nút điều khiển
+        const startButton = document.getElementById('startButton');
+        const screenshotButton = document.getElementById('screenshotButton');
+        const stopButton = document.getElementById('stopButton');
+        const downloadRecordingButton = document.getElementById('downloadRecordingButton');
+
 
         // --- CHỨC NĂNG LLM (Tạo Câu Trả Lời) ---
         async function fetchRetry(url, options, retries = 3) {
@@ -311,6 +358,7 @@
                     const response = await fetch(url, options);
                     if (!response.ok) {
                         const errorBody = await response.json();
+                        // Ném lỗi bao gồm thông báo chi tiết
                         throw new Error(`HTTP error! status: ${response.status}. Message: ${JSON.stringify(errorBody)}`);
                     }
                     return response;
@@ -319,6 +367,7 @@
                         const delay = Math.pow(2, i) * 1000;
                         await new Promise(resolve => setTimeout(resolve, delay));
                     } else {
+                        // Ném lỗi cuối cùng sau khi hết số lần thử lại
                         throw error;
                     }
                 }
@@ -350,6 +399,7 @@
         async function sendToAI(userQuery, imageBase64 = null) {
             const isImageQuery = !!imageBase64;
             const systemPrompt = "Bạn là một trợ lý giáo dục nhanh nhẹn và thông minh. Hãy trả lời câu hỏi của học sinh một cách ngắn gọn, chính xác và dễ hiểu bằng tiếng Việt. Nếu có ảnh, hãy phân tích ảnh để trả lời. Sử dụng Google Search cho các câu hỏi cần dữ liệu mới nhất.";
+            // CHÚ Ý: API key PHẢI là chuỗi rỗng để Canvas tự động cung cấp
             const apiKey = ""; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
@@ -412,8 +462,9 @@
                 return generatedText.replace(/\n/g, '<br>') + sourceHTML;
 
             } catch (error) {
+                // Đảm bảo thông báo lỗi thân thiện hơn
                 console.error("Lỗi gọi API Gemini:", error);
-                return `<span class="text-red-500">Lỗi: Không thể kết nối với AI để tạo câu trả lời. (${error.message})</span>`;
+                return `<span class="text-red-500">Lỗi: Không thể kết nối với AI để tạo câu trả lời. Vui lòng thử lại. Chi tiết lỗi: (${error.message})</span>`;
             }
         }
         
@@ -440,28 +491,27 @@
             chatOutput.scrollTop = chatOutput.scrollHeight; // Cuộn xuống cuối
         }
 
-        async function handleChatSubmission(sendImage = false) {
+        async function handleChatSubmission() {
             const userQuery = chatTextInput.value.trim();
-            let imageBase64 = null;
+            const imageBase64 = pendingImageBase64;
             
-            if (!userQuery && !sendImage) {
-                updateStatus('Vui lòng nhập câu hỏi hoặc chọn gửi kèm ảnh!', 'error');
+            if (!userQuery && !imageBase64) {
+                updateStatus('Vui lòng nhập câu hỏi hoặc dán ảnh!', 'error');
                 return;
             }
 
             // Vô hiệu hóa input/buttons và hiển thị trạng thái tải
             chatTextInput.disabled = true;
             sendQueryButton.disabled = true;
-            sendScreenshotButton.disabled = true;
+            pasteStatus.classList.add('hidden');
+            chatTextInput.classList.remove('has-pasted-image');
             
-            // Lấy ảnh Base64 nếu được yêu cầu
-            if (sendImage) {
-                imageBase64 = await takeScreenshot(false); // Chụp nhưng không lưu vào Firestore
-            }
-
             // Hiển thị tin nhắn người dùng (có thể kèm ảnh)
-            renderMessage(userQuery || (sendImage ? '[Không có văn bản]' : ''), 'user', sendImage ? imageBase64 : null);
+            renderMessage(userQuery || (imageBase64 ? '[Không có văn bản]' : ''), 'user', imageBase64);
             chatTextInput.value = '';
+
+            // Reset biến pending
+            pendingImageBase64 = null;
 
             // Thêm placeholder cho câu trả lời AI
             renderMessage('<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>AI đang xử lý...</span>', 'ai');
@@ -471,11 +521,11 @@
                 const aiResponse = await sendToAI(userQuery, imageBase64);
                 aiMessageElement.innerHTML = aiResponse;
             } catch (error) {
-                aiMessageElement.innerHTML = `<span class="text-red-500">Lỗi: Không thể nhận phản hồi từ AI.</span>`;
+                // Hiển thị lỗi fetch cuối cùng
+                aiMessageElement.innerHTML = `<span class="text-red-500">Lỗi: Không thể nhận phản hồi từ AI. Vui lòng thử lại.</span><p class="mt-1 text-xs text-red-400">Chi tiết: ${error.message}</p>`;
             } finally {
                 chatTextInput.disabled = false;
                 sendQueryButton.disabled = false;
-                sendScreenshotButton.disabled = false;
                 chatOutput.scrollTop = chatOutput.scrollHeight; 
             }
         }
@@ -760,7 +810,6 @@
                     startButton.disabled = false;
                     stopButton.disabled = true;
                     screenshotButton.disabled = true;
-                    sendScreenshotButton.disabled = true;
                 };
 
                 mediaRecorder.start(1000);
@@ -778,7 +827,6 @@
                 startButton.disabled = true;
                 stopButton.disabled = false;
                 screenshotButton.disabled = false;
-                sendScreenshotButton.disabled = false; // Kích hoạt nút gửi kèm ảnh
 
             } catch (err) {
                 console.error("Lỗi khi bắt đầu giám sát:", err);
@@ -810,7 +858,7 @@
             startButton.disabled = false;
             stopButton.disabled = true;
             screenshotButton.disabled = true;
-            sendScreenshotButton.disabled = true; // Vô hiệu hóa nút gửi kèm ảnh
+            downloadRecordingButton.disabled = true; // Đảm bảo nút download cũng tắt
             updateStatus('Đã dừng giám sát. Vui lòng nhấn "Bắt Đầu" để học buổi mới.', 'info');
         }
 
@@ -821,6 +869,11 @@
          */
         function takeScreenshot(saveToFirestore = true) {
             if (!screenStream) {
+                // Nếu không chia sẻ màn hình, nhưng có yêu cầu chụp (thường là tự động hoặc phím S), thì bỏ qua.
+                if (!saveToFirestore) {
+                    // Nếu là chụp để gửi AI (saveToFirestore=false) và không có stream, KHÔNG thể chụp
+                    return null;
+                }
                 updateStatus('Lỗi: Bạn chưa bắt đầu chia sẻ màn hình.', 'error');
                 return null;
             }
@@ -848,6 +901,59 @@
             
             return imageDataUrl;
         }
+
+        // --- CHỨC NĂNG DÁN ẢNH ---
+        function handlePaste(event) {
+            if (!event.clipboardData || !event.clipboardData.items) {
+                return;
+            }
+
+            for (let i = 0; i < event.clipboardData.items.length; i++) {
+                const item = event.clipboardData.items[i];
+                if (item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    if (blob) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            pendingImageBase64 = e.target.result; // Lưu trữ Data URL
+                            chatTextInput.classList.add('has-pasted-image');
+                            pasteStatus.classList.remove('hidden');
+                        };
+                        reader.readAsDataURL(blob);
+                        event.preventDefault(); // Ngăn dán văn bản ảnh vào input
+                        return;
+                    }
+                }
+            }
+            
+            // Xử lý dán văn bản (nếu người dùng dán văn bản sau khi dán ảnh)
+            // Nếu có pendingImageBase64, ẩn trạng thái ảnh dán đi
+            if (pendingImageBase64) {
+                 setTimeout(() => {
+                    // Cần delay một chút để cho phép dán văn bản hoàn tất
+                    pasteStatus.classList.add('hidden');
+                    chatTextInput.classList.remove('has-pasted-image');
+                    // Không xóa pendingImageBase64, vì ảnh dán đã được lưu lại
+                 }, 10);
+            }
+        }
+        
+        function handleChatInputKeydown(event) {
+            // Khi người dùng bấm phím, có thể là họ đang gõ đè lên ảnh dán, reset trạng thái dán.
+            // Ngoại trừ phím Enter (vì Enter dùng để gửi)
+             if (event.key !== 'Enter' && pendingImageBase64) {
+                // Nếu người dùng bắt đầu gõ chữ, loại bỏ hiệu ứng ảnh dán
+                // pendingImageBase64 vẫn được giữ lại để gửi cùng với văn bản mới
+                chatTextInput.classList.remove('has-pasted-image');
+                pasteStatus.classList.add('hidden');
+            }
+            
+            if (event.key === 'Enter' && !sendQueryButton.disabled) {
+                event.preventDefault();
+                handleChatSubmission();
+            }
+        }
+
 
         function renderScreenshots(screenshots) {
             screenshotsContainer.innerHTML = ''; // Xóa nội dung cũ
@@ -933,13 +1039,15 @@
             screenshotButton.addEventListener('click', () => takeScreenshot(true)); 
             downloadRecordingButton.addEventListener('click', downloadRecording);
 
-            // 3. Thiết lập nút Chat AI
-            sendQueryButton.addEventListener('click', () => handleChatSubmission(false));
-            sendScreenshotButton.addEventListener('click', () => handleChatSubmission(true));
-            chatTextInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' && !sendQueryButton.disabled) {
-                    event.preventDefault();
-                    handleChatSubmission(false);
+            // 3. Thiết lập chức năng Chat AI (Bây giờ đã hỗ trợ Ctrl+V)
+            sendQueryButton.addEventListener('click', handleChatSubmission);
+            chatTextInput.addEventListener('paste', handlePaste);
+            chatTextInput.addEventListener('keydown', handleChatInputKeydown);
+            chatTextInput.addEventListener('input', () => {
+                // Khi người dùng gõ/xóa, nếu không có ảnh pending, ẩn trạng thái dán
+                if (!pendingImageBase64) {
+                    pasteStatus.classList.add('hidden');
+                    chatTextInput.classList.remove('has-pasted-image');
                 }
             });
 
