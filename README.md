@@ -1,1 +1,1 @@
-# AI-gi-m-s-t-h-c-t-p
+# AI giám sát học tập Beta 1.0
