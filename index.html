@@ -31,6 +31,18 @@
             transform: translateY(-1px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
         }
+        .screenshot-card {
+            position: relative;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            opacity: 0.8;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="p-4 sm:p-8">
@@ -40,7 +52,7 @@
             Công Cụ Ghi Màn Hình Học Tập
         </h1>
         <p class="text-gray-600 mb-6">
-            Chọn màn hình để chia sẻ và bắt đầu ghi lại. Nhấn "Chụp Màn Hình" khi giáo viên yêu cầu ghi chú.
+            Chọn màn hình để chia sẻ và bắt đầu ghi lại. Ảnh chụp ghi chú sẽ được lưu trữ tự động.
         </p>
 
         <!-- Thông báo Trạng thái -->
@@ -82,17 +94,23 @@
 
         <!-- Khu vực Hiển thị Ảnh Chụp -->
         <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">
-            Ảnh Chụp Ghi Chú Đã Lưu
+            Ảnh Chụp Ghi Chú Đã Lưu (Lưu Trữ Vĩnh Viễn)
         </h2>
         <div id="screenshotsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            <p id="noScreenshotsMessage" class="text-gray-500 italic col-span-full">
+            <p id="loadingMessage" class="text-gray-500 italic col-span-full">
+                Đang tải ghi chú đã lưu...
+            </p>
+            <p id="noScreenshotsMessage" class="text-gray-500 italic col-span-full hidden">
                 Chưa có ảnh chụp nào được lưu.
             </p>
         </div>
 
         <div class="mt-8 pt-4 border-t text-sm text-gray-500">
             <p>
-                *Lưu ý: Để có tính năng AI nhận diện giọng nói tiếng Việt tự động, cần có một dịch vụ máy chủ chuyên dụng. Phiên bản này sử dụng nút bấm thủ công để thay thế.
+                *Lưu ý: Dữ liệu ảnh chụp của bạn (Ghi Chú) hiện được lưu trữ an toàn trong Firestore Database. Video ghi lại vẫn là dữ liệu phiên (session data).
+            </p>
+            <p>
+                **ID Người Dùng Hiện Tại (để lưu dữ liệu):** <span id="currentUserId" class="font-mono text-xs bg-gray-100 p-1 rounded">Đang tải...</span>
             </p>
             <p>
                 **Mẹo: Bạn có thể nhấn phím **'S'** để chụp màn hình nhanh thay vì nhấn nút.
@@ -100,11 +118,28 @@
         </div>
     </div>
 
-    <script>
-        // Khai báo các biến toàn cục
-        let screenStream = null; // Luồng chia sẻ màn hình
-        let mediaRecorder = null; // Đối tượng ghi phương tiện
-        let recordedChunks = []; // Mảng chứa các đoạn dữ liệu video
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, orderBy, addDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Cấu hình Firebase MANDATORY ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db = null;
+        let auth = null;
+        let userId = null;
+        let isAuthReady = false;
+
+        // Bật logging để gỡ lỗi
+        setLogLevel('Debug');
+        
+        // Khai báo các biến toàn cục cho chức năng ghi hình
+        let screenStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
         let isRecording = false;
         
         // Lấy các phần tử DOM
@@ -114,16 +149,147 @@
         const screenshotCanvas = document.getElementById('screenshotCanvas');
         const screenshotsContainer = document.getElementById('screenshotsContainer');
         const noScreenshotsMessage = document.getElementById('noScreenshotsMessage');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const currentUserIdElement = document.getElementById('currentUserId');
 
         const startButton = document.getElementById('startButton');
         const stopButton = document.getElementById('stopButton');
         const screenshotButton = document.getElementById('screenshotButton');
         const downloadRecordingButton = document.getElementById('downloadRecordingButton');
 
+        // --- Chức năng Firebase ---
+        
+        /**
+         * Khởi tạo Firebase và Xác thực người dùng
+         */
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Xác thực người dùng
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        currentUserIdElement.textContent = userId;
+                        isAuthReady = true;
+                        updateStatus('Đã kết nối với hệ thống lưu trữ. Sẵn sàng học tập!', 'success');
+                        // Bắt đầu lắng nghe dữ liệu sau khi xác thực xong
+                        loadScreenshotsFromFirestore();
+                    } else {
+                        userId = crypto.randomUUID(); // Fallback cho trường hợp ẩn danh
+                        currentUserIdElement.textContent = "Ẩn danh - " + userId.substring(0, 8) + '...';
+                        isAuthReady = true;
+                        loadScreenshotsFromFirestore();
+                        // Dù là ẩn danh, vẫn có thể thử lưu trữ theo userId ngẫu nhiên (dành cho phiên hiện tại)
+                    }
+                });
+
+            } catch (error) {
+                console.error("Lỗi khi khởi tạo Firebase:", error);
+                updateStatus(`Lỗi nghiêm trọng: Không thể kết nối Firestore. Ảnh chụp sẽ không được lưu.`, 'error');
+            }
+        }
+
+        /**
+         * Đường dẫn Collection đến ảnh chụp của người dùng hiện tại
+         */
+        function getCollectionPath() {
+            if (!userId) return null;
+            // Dùng cấu trúc private data: /artifacts/{appId}/users/{userId}/screenshots
+            return `artifacts/${appId}/users/${userId}/screenshots`;
+        }
+
+        /**
+         * Tải và lắng nghe ảnh chụp từ Firestore
+         */
+        function loadScreenshotsFromFirestore() {
+            if (!isAuthReady || !db || !userId) return;
+
+            const path = getCollectionPath();
+            if (!path) return;
+            
+            const screenshotsCollection = collection(db, path);
+            // Lắng nghe theo thời gian tạo (tuy nhiên không dùng orderBy để tránh lỗi index)
+            const q = query(screenshotsCollection); 
+
+            onSnapshot(q, (snapshot) => {
+                const loadedScreenshots = [];
+                snapshot.forEach((doc) => {
+                    loadedScreenshots.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                // Sắp xếp thủ công bằng JavaScript theo timestamp (mới nhất lên trước)
+                loadedScreenshots.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+
+                renderScreenshots(loadedScreenshots);
+            }, (error) => {
+                console.error("Lỗi khi lắng nghe ảnh chụp:", error);
+                updateStatus('Lỗi tải ảnh chụp. Vui lòng kiểm tra console.', 'error');
+            });
+        }
+
+        /**
+         * Lưu ảnh chụp mới vào Firestore
+         * @param {string} dataUrl - Dữ liệu base64 của ảnh
+         */
+        async function saveScreenshotToFirestore(dataUrl) {
+            if (!isAuthReady || !db || !userId) {
+                updateStatus('Lỗi: Chưa kết nối hệ thống lưu trữ.', 'error');
+                return;
+            }
+
+            const path = getCollectionPath();
+            if (!path) return;
+
+            try {
+                // Lưu trữ dữ liệu: Base64 URL, thời gian tạo
+                await addDoc(collection(db, path), {
+                    imageData: dataUrl,
+                    timestamp: new Date(),
+                });
+                updateStatus('Đã lưu ghi chú vào Database thành công!', 'info');
+
+            } catch (error) {
+                console.error("Lỗi khi lưu ảnh chụp:", error);
+                updateStatus('Lỗi khi lưu ghi chú vào Database.', 'error');
+            }
+        }
+        
+        /**
+         * Xóa ảnh chụp khỏi Firestore
+         * @param {string} screenshotId - ID Document của ảnh chụp
+         */
+        async function deleteScreenshotFromFirestore(screenshotId) {
+            if (!isAuthReady || !db || !userId) return;
+
+            const path = getCollectionPath();
+            if (!path) return;
+
+            try {
+                await deleteDoc(doc(db, path, screenshotId));
+                updateStatus('Đã xóa ghi chú thành công.', 'info');
+            } catch (error) {
+                console.error("Lỗi khi xóa ảnh chụp:", error);
+                updateStatus('Lỗi khi xóa ghi chú.', 'error');
+            }
+        }
+
+
+        // --- Chức năng Giao diện & Ghi hình ---
+
         /**
          * Hàm cập nhật trạng thái giao diện người dùng
-         * @param {string} message - Tin nhắn trạng thái
-         * @param {string} type - Loại thông báo (ví dụ: 'info', 'success', 'error')
          */
         function updateStatus(message, type = 'info') {
             statusMessage.textContent = message;
@@ -144,11 +310,7 @@
         async function startMonitoring() {
             updateStatus('Đang yêu cầu quyền chia sẻ màn hình...', 'info');
             try {
-                // Yêu cầu quyền chia sẻ màn hình
-                screenStream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: true, 
-                    audio: true // Tùy chọn bao gồm cả âm thanh hệ thống
-                });
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 
                 if (!screenStream) {
                     throw new Error("Người dùng đã hủy chia sẻ màn hình.");
@@ -158,11 +320,8 @@
                 screenPreview.style.display = 'block';
                 noStreamMessage.classList.add('hidden');
                 
-                // Cài đặt Media Recorder
                 recordedChunks = [];
-                mediaRecorder = new MediaRecorder(screenStream, { 
-                    mimeType: 'video/webm; codecs=vp8' 
-                });
+                mediaRecorder = new MediaRecorder(screenStream, { mimeType: 'video/webm; codecs=vp8' });
 
                 mediaRecorder.ondataavailable = event => {
                     if (event.data.size > 0) {
@@ -179,10 +338,9 @@
                     screenshotButton.disabled = true;
                 };
 
-                mediaRecorder.start(1000); // Ghi dữ liệu mỗi 1000ms
+                mediaRecorder.start(1000);
                 isRecording = true;
 
-                // Thiết lập lắng nghe khi người dùng dừng chia sẻ (nút Stop ở trình duyệt)
                 const track = screenStream.getVideoTracks()[0];
                 if (track) {
                     track.onended = stopMonitoring;
@@ -195,7 +353,7 @@
 
             } catch (err) {
                 console.error("Lỗi khi bắt đầu giám sát:", err);
-                updateStatus(`Lỗi: ${err.message || 'Không thể bắt đầu chia sẻ màn hình. Vui lòng thử lại.'}`, 'error');
+                updateStatus(`Lỗi: ${err.message || 'Không thể bắt đầu chia sẻ màn hình.'}`, 'error');
                 resetState();
             }
         }
@@ -211,7 +369,6 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
             } else {
-                // Nếu dừng mà không có ghi hình (trường hợp lỗi)
                 resetState();
             }
             
@@ -232,7 +389,7 @@
         }
 
         /**
-         * Chụp một khung hình từ luồng video đang chạy và hiển thị
+         * Chụp một khung hình từ luồng video đang chạy và lưu vào Firestore
          */
         function takeScreenshot() {
             if (!screenStream) {
@@ -240,7 +397,6 @@
                 return;
             }
             
-            // Đảm bảo video đang có dữ liệu để vẽ
             if (screenPreview.readyState < 2) {
                 updateStatus('Video chưa sẵn sàng để chụp. Vui lòng đợi một chút.', 'error');
                 return;
@@ -250,51 +406,69 @@
             const canvas = screenshotCanvas;
             const context = canvas.getContext('2d');
 
-            // Thiết lập kích thước canvas bằng kích thước video
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            // Vẽ khung hình hiện tại lên canvas
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Chuyển canvas thành URL ảnh (base64)
             const imageDataUrl = canvas.toDataURL('image/png');
             
-            // Hiển thị ảnh chụp
-            displayScreenshot(imageDataUrl);
-            updateStatus('Đã chụp ghi chú thành công!', 'info');
+            // LƯU VÀO FIRESTORE để đảm bảo tính lâu dài
+            saveScreenshotToFirestore(imageDataUrl);
         }
 
         /**
-         * Hiển thị ảnh chụp lên giao diện người dùng
-         * @param {string} dataUrl - Dữ liệu base64 của ảnh
+         * Hiển thị danh sách ảnh chụp từ Firestore
          */
-        function displayScreenshot(dataUrl) {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('vi-VN');
-            
-            // Xóa thông báo "chưa có ảnh" nếu đây là ảnh đầu tiên
-            if (noScreenshotsMessage) {
-                 noScreenshotsMessage.classList.add('hidden');
-            }
+        function renderScreenshots(screenshots) {
+            screenshotsContainer.innerHTML = ''; // Xóa nội dung cũ
+            loadingMessage.classList.add('hidden');
 
-            const card = document.createElement('div');
-            card.className = 'bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300';
-            card.innerHTML = `
-                <img src="${dataUrl}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b">
-                <div class="p-3">
-                    <p class="text-xs font-medium text-indigo-600">Ghi chú lúc: ${timeString}</p>
-                    <a href="${dataUrl}" download="GhiChu_${now.getTime()}.png" 
-                       class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 font-semibold transition duration-150">
-                        Tải Xuống (PNG)
-                    </a>
-                </div>
-            `;
-            screenshotsContainer.prepend(card); // Thêm ảnh chụp mới nhất lên đầu
+            if (screenshots.length === 0) {
+                noScreenshotsMessage.classList.remove('hidden');
+                return;
+            }
+            noScreenshotsMessage.classList.add('hidden');
+
+            screenshots.forEach(item => {
+                const now = item.timestamp ? item.timestamp.toDate() : new Date();
+                const timeString = now.toLocaleTimeString('vi-VN');
+                const dateString = now.toLocaleDateString('vi-VN');
+                
+                const card = document.createElement('div');
+                card.className = 'screenshot-card bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300';
+                card.innerHTML = `
+                    <button class="delete-btn p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition duration-150" data-id="${item.id}" aria-label="Xóa ảnh chụp">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <img src="${item.imageData}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b">
+                    <div class="p-3">
+                        <p class="text-xs font-medium text-indigo-600">Ghi chú: ${dateString} ${timeString}</p>
+                        <a href="${item.imageData}" download="GhiChu_${item.id}.png" 
+                           class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 font-semibold transition duration-150">
+                            Tải Xuống (PNG)
+                        </a>
+                    </div>
+                `;
+                screenshotsContainer.appendChild(card);
+            });
+            
+            // Thêm lắng nghe sự kiện xóa sau khi render
+            screenshotsContainer.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    if (id) {
+                        deleteScreenshotFromFirestore(id);
+                    }
+                });
+            });
         }
 
+
         /**
-         * Tải xuống video đã ghi lại
+         * Tải xuống video đã ghi lại (Không lưu vào DB do kích thước)
          */
         function downloadRecording() {
             if (recordedChunks.length === 0) {
@@ -302,9 +476,7 @@
                 return;
             }
 
-            const blob = new Blob(recordedChunks, {
-                type: 'video/webm'
-            });
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
@@ -314,28 +486,29 @@
             document.body.appendChild(a);
             a.click();
             
-            // Dọn dẹp
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             
             updateStatus('Đã tạo liên kết tải xuống video. Vui lòng kiểm tra thư mục tải xuống.', 'success');
         }
 
-        // --- Thiết lập sự kiện ---
+        // --- Thiết lập sự kiện và Khởi tạo ---
         window.onload = function() {
-            // Thiết lập các nút bấm
+            // 1. Khởi tạo Firebase
+            initializeFirebase();
+            
+            // 2. Thiết lập các nút bấm
             startButton.addEventListener('click', startMonitoring);
             stopButton.addEventListener('click', stopMonitoring);
             screenshotButton.addEventListener('click', takeScreenshot);
             downloadRecordingButton.addEventListener('click', downloadRecording);
 
-            // Phím tắt (Hotkeys)
+            // 3. Phím tắt (Hotkeys)
             document.addEventListener('keydown', (event) => {
                 if (event.key === 's' || event.key === 'S') {
                     if (!screenshotButton.disabled) {
-                         event.preventDefault(); // Ngăn chặn hành động mặc định của trình duyệt
+                         event.preventDefault();
                          takeScreenshot();
-                         // Tăng thêm phản hồi thị giác
                          screenshotButton.classList.add('animate-pulse');
                          setTimeout(() => {
                              screenshotButton.classList.remove('animate-pulse');
@@ -344,7 +517,7 @@
                 }
             });
             
-            updateStatus('Sẵn sàng. Nhấn "Bắt Đầu Giám Sát" để chọn màn hình học tập của bạn.', 'info');
+            updateStatus('Đang kết nối với hệ thống lưu trữ...');
         }
     </script>
 </body>
