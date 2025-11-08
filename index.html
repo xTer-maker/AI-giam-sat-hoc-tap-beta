@@ -175,6 +175,18 @@
         <div id="statusMessage" class="mb-4 p-3 text-sm rounded-lg hidden">
             Đang chờ bạn bắt đầu giám sát...
         </div>
+        
+        <!-- THÔNG BÁO API KEY ĐÃ CHÈN CỨNG -->
+        <div class="mb-6 p-4 rounded-lg border border-red-500 dark:border-red-700 bg-red-50 dark:bg-red-900/50">
+            <p class="text-sm font-bold text-red-800 dark:text-red-300">
+                ⚠️ CẢNH BÁO BẢO MẬT: Khóa API đã được chèn công khai vào mã nguồn. 
+            </p>
+            <p class="mt-1 text-xs text-red-700 dark:text-red-400">
+                **Khóa API của bạn (một phần):** <span id="displayedApiKey" class="font-mono bg-red-100 dark:bg-red-800 px-1 rounded text-red-900 dark:text-red-100"></span>.
+                Bất kỳ ai cũng có thể lấy khóa này, và bạn chịu trách nhiệm cho mọi chi phí phát sinh.
+            </p>
+        </div>
+
 
         <!-- THÔNG TIN HỌC SINH -->
         <div class="mb-6 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -251,7 +263,6 @@
             </div>
 
             <!-- Khu vực Nhập Chat -->
-            <!-- Thêm placeholder cho ảnh dán -->
             <div class="flex items-center space-x-2">
                 <input type="text" id="chatTextInput" placeholder="Nhập câu hỏi của bạn (hoặc Ctrl+V để dán ảnh)..." 
                     class="flex-grow p-3 border border-purple-400 dark:border-purple-600 rounded-lg focus:ring-purple-500 focus:border-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" />
@@ -262,7 +273,6 @@
                     </svg>
                 </button>
             </div>
-            <!-- Đã XÓA nút Gửi Kèm Ảnh -->
             <p id="pasteStatus" class="mt-2 text-sm text-green-600 dark:text-green-400 hidden">
                  📸 Đã phát hiện ảnh dán. Bấm Gửi để AI phân tích!
             </p>
@@ -306,6 +316,15 @@
         let auth = null;
         let userId = null;
         let isAuthReady = false;
+        
+        // --- CẤU HÌNH API KEY (ĐÃ CHÈN CỨNG) ---
+        // Vui lòng LƯU Ý RỦI RO BẢO MẬT. Key này được hiển thị công khai.
+        const PUBLIC_API_KEY = "AIzaSyBK7MdXPKnKyC6a_6yTHmlAB-IPNOfdLcE"; 
+        let geminiApiKey = PUBLIC_API_KEY;
+
+        // Cập nhật thông báo rủi ro trên giao diện
+        document.getElementById('displayedApiKey').textContent = PUBLIC_API_KEY.substring(0, 15) + '...';
+
 
         setLogLevel('Debug');
         
@@ -397,10 +416,16 @@
          * @param {string | null} imageBase64 - Base64 Data URL của ảnh chụp màn hình (tùy chọn).
          */
         async function sendToAI(userQuery, imageBase64 = null) {
+            
+            // Khóa đã được chèn cứng và gán cho geminiApiKey
+            if (!geminiApiKey) {
+                return `<span class="text-red-500">Lỗi: Thiếu Khóa API. Khóa đã bị xóa hoặc không được tải.</span>`;
+            }
+
             const isImageQuery = !!imageBase64;
             const systemPrompt = "Bạn là một trợ lý giáo dục nhanh nhẹn và thông minh. Hãy trả lời câu hỏi của học sinh một cách ngắn gọn, chính xác và dễ hiểu bằng tiếng Việt. Nếu có ảnh, hãy phân tích ảnh để trả lời. Sử dụng Google Search cho các câu hỏi cần dữ liệu mới nhất.";
-            // CHÚ Ý: API key PHẢI là chuỗi rỗng để Canvas tự động cung cấp
-            const apiKey = ""; 
+            
+            const apiKey = geminiApiKey; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
             const contentParts = [{ text: userQuery }];
@@ -411,8 +436,6 @@
                 if (imagePart) {
                     contentParts.push(imagePart);
                 }
-                // Tắt Google Search khi có ảnh để tập trung vào VLM (Vision Language Model)
-                // tools = []; 
             }
 
             const payload = {
@@ -464,7 +487,15 @@
             } catch (error) {
                 // Đảm bảo thông báo lỗi thân thiện hơn
                 console.error("Lỗi gọi API Gemini:", error);
-                return `<span class="text-red-500">Lỗi: Không thể kết nối với AI để tạo câu trả lời. Vui lòng thử lại. Chi tiết lỗi: (${error.message})</span>`;
+                
+                let errorMessage = `Lỗi: Không thể kết nối với AI để tạo câu trả lời. Vui lòng thử lại. Chi tiết lỗi: (${error.message})`;
+                
+                // Kiểm tra lỗi 403 (chưa cấp phép/sai key)
+                if (error.message.includes("403")) {
+                     errorMessage = `Lỗi: Khóa API không hợp lệ hoặc hết hạn. Khóa API hiện tại có thể đã bị vô hiệu hóa do bị lộ công khai. Chi tiết: (${error.message})`;
+                }
+
+                return `<span class="text-red-500">${errorMessage}</span>`;
             }
         }
         
@@ -499,6 +530,11 @@
                 updateStatus('Vui lòng nhập câu hỏi hoặc dán ảnh!', 'error');
                 return;
             }
+            
+            if (!geminiApiKey) {
+                renderMessage('<span class="text-red-500">Lỗi: Khóa API đã bị xóa hoặc không hợp lệ.</span>', 'ai');
+                return;
+            }
 
             // Vô hiệu hóa input/buttons và hiển thị trạng thái tải
             chatTextInput.disabled = true;
@@ -521,7 +557,7 @@
                 const aiResponse = await sendToAI(userQuery, imageBase64);
                 aiMessageElement.innerHTML = aiResponse;
             } catch (error) {
-                // Hiển thị lỗi fetch cuối cùng
+                // Hiển thị lỗi fetch cuối cùng (nếu fetchRetry không bắt được lỗi)
                 aiMessageElement.innerHTML = `<span class="text-red-500">Lỗi: Không thể nhận phản hồi từ AI. Vui lòng thử lại.</span><p class="mt-1 text-xs text-red-400">Chi tiết: ${error.message}</p>`;
             } finally {
                 chatTextInput.disabled = false;
@@ -758,8 +794,8 @@
                 updateStatus('Lỗi khi xóa ghi chú.', 'error');
             }
         }
-
-
+        
+        
         // --- Chức năng Giao diện & Ghi hình ---
 
         function updateStatus(message, type = 'info') {
@@ -1024,10 +1060,10 @@
 
         // --- Thiết lập sự kiện và Khởi tạo ---
         window.onload = function() {
-            // 0. Khởi tạo Chủ đề
+            // 0. Khởi tạo Chủ đề & API Key
             initializeTheme();
             themeToggleButton.addEventListener('click', toggleTheme);
-
+            
             // 1. Khởi tạo Firebase
             initializeFirebase();
             
