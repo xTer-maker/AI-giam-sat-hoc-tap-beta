@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công Cụ Ghi Màn Hình Học Tập</title>
+    <title>Công Cụ Giám Sát Học Tập (Có Chụp Màn Hình Ghi Chú)</title>
     <!-- Tải Tailwind CSS để tạo giao diện đẹp và responsive -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -31,7 +31,6 @@
             transition: background-color 0.3s, color 0.3s;
         }
         .container {
-            /* Đã tăng max-width từ 1000px lên 1200px */
             max-width: 1200px; 
             margin: 0 auto;
             background-color: var(--bg-card);
@@ -52,18 +51,7 @@
             transform: translateY(-1px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
         }
-        .screenshot-card {
-            position: relative;
-        }
-        .delete-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            opacity: 0.9;
-        }
-        .delete-btn:hover {
-            opacity: 1;
-        }
+        
         #transcriptPanel {
             max-height: 150px;
             overflow-y: auto;
@@ -123,26 +111,51 @@
             /* Bố cục cho mobile */
             grid-template-areas: 
                 "start"
-                "screenshot"
                 "stop"
+                "screenshot"
                 "download";
             grid-template-columns: 1fr;
         }
 
         @media (min-width: 640px) { /* sm breakpoint */
             .control-grid {
-                 /* Bố cục cho tablet/desktop: Nút Start chiếm hàng đầu, 3 nút còn lại ở hàng dưới */
+                 /* Bố cục cho tablet/desktop */
                 grid-template-areas: 
-                    "start start start"
-                    "screenshot stop download";
-                grid-template-columns: 1fr 1fr 1fr;
+                    "start stop screenshot download";
+                grid-template-columns: repeat(4, 1fr);
             }
         }
         /* Định vị các nút trong Grid */
         #startButton { grid-area: start; }
-        #screenshotButton { grid-area: screenshot; }
         #stopButton { grid-area: stop; }
+        #takeScreenshotButton { grid-area: screenshot; }
         #downloadRecordingButton { grid-area: download; }
+        
+        /* Styling cho Khu vực ảnh chụp */
+        .screenshot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        .screenshot-item {
+            position: relative;
+            background-color: var(--bg-body);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .screenshot-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .screenshot-item img:hover {
+            transform: scale(1.05);
+        }
 
     </style>
 </head>
@@ -153,7 +166,7 @@
         <!-- HEADER VÀ CHẾ ĐỘ SÁNG/TỐI -->
         <div class="flex justify-between items-center mb-6 border-b pb-4">
             <h1 class="text-3xl font-bold">
-                Công Cụ Ghi Màn Hình Học Tập
+                Công Cụ Ghi Hình & Giám Sát Học Tập
             </h1>
             <button id="themeToggleButton" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 transition-colors">
                 <!-- Icon Mặt Trời -->
@@ -168,7 +181,7 @@
         </div>
 
         <p class="text-gray-600 dark:text-gray-400 mb-6">
-            Chọn màn hình để chia sẻ và bắt đầu ghi lại. Ảnh chụp ghi chú sẽ được lưu trữ tự động.
+            Chọn màn hình để chia sẻ và bắt đầu ghi lại. Nhấn "Chụp Màn Hình" để lưu ghi chú hình ảnh.
         </p>
 
         <!-- Thông báo Trạng thái -->
@@ -182,7 +195,7 @@
                 🔑 Cấu hình Trợ lý AI (Bắt buộc)
             </h3>
             <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                Để sử dụng tính năng Chat và Phân tích Hình ảnh, bạn cần nhập **Khóa API Google Gemini** của mình. Khóa này được lưu cục bộ và không được chia sẻ.
+                Để sử dụng tính năng Chat AI, bạn cần nhập **Khóa API Google Gemini** của mình. Khóa này được lưu cục bộ và không được chia sẻ.
             </p>
             <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <input type="password" id="apiKeyInput" placeholder="Nhập Gemini API Key của bạn (AIzaSy...)" 
@@ -208,7 +221,7 @@
             </p>
         </div>
 
-        <!-- Vùng Xem Trước & Canvas Ẩn -->
+        <!-- Vùng Xem Trước & Canvas -->
         <div class="relative mb-6 bg-gray-900 rounded-xl overflow-hidden shadow-inner">
             <video id="screenPreview" autoplay muted class="rounded-xl"></video>
             <canvas id="screenshotCanvas" class="hidden"></canvas>
@@ -220,23 +233,36 @@
             </div>
         </div>
         
-        <!-- Khu vực Điều khiển (ĐÃ THAY ĐỔI VỊ TRÍ) -->
+        <!-- Khu vực Điều khiển -->
         <div class="control-grid mb-8 border-t pt-6">
             <button id="startButton" class="btn-primary px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
-                <span class="mr-2">▶️</span> Bắt Đầu Giám Sát
-            </button>
-            
-            <button id="screenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-gray-900 rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
-                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Thủ Công - Phím 'S')
+                <span class="mr-2">▶️</span> Bắt Đầu Giám Sát & Ghi Hình
             </button>
             
             <button id="stopButton" class="btn-primary px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:opacity-50" disabled>
                 <span class="mr-2">🛑</span> Dừng & Hoàn Thành
             </button>
             
+            <button id="takeScreenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
+                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (S)
+            </button>
+
             <button id="downloadRecordingButton" class="btn-primary px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50" disabled>
                 <span class="mr-2">⬇️</span> Tải Video Ghi Lại
             </button>
+        </div>
+
+        <!-- KHU VỰC ẢNH CHỤP GHI CHÚ ĐÃ LƯU -->
+        <div class="mb-6 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700">
+            <h3 class="text-lg font-semibold mb-3 text-yellow-700 dark:text-yellow-300">
+                🖼️ Ảnh Chụp Ghi Chú Đã Lưu (<span id="screenshotCount">0</span>)
+            </h3>
+            <div id="screenshotsGrid" class="screenshot-grid">
+                <!-- Ảnh chụp sẽ được hiển thị ở đây -->
+            </div>
+            <p id="noScreenshots" class="mt-4 text-sm text-gray-500 dark:text-gray-400 hidden">
+                Chưa có ảnh chụp nào được lưu. Hãy nhấn "Chụp Màn Hình Ngay" để tạo ghi chú.
+            </p>
         </div>
 
 
@@ -249,14 +275,14 @@
                 Đang chờ Bắt Đầu Phiên mã...
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                **Đã kích hoạt chức năng TỰ ĐỘNG CHỤP** khi phát hiện lệnh "chép bài" hoặc "ghi chép" (Cooldown 5s).
+                *Phiên mã giọng nói sẽ hiển thị ở đây.*
             </p>
         </div>
         
-        <!-- KHU VỰC HỖ TRỢ TRẢ LỜI AI (Đã chuyển thành Chat) -->
+        <!-- KHU VỰC HỖ TRỢ TRẢ LỜI AI (Chat) -->
         <div class="mb-6 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/50 border border-purple-300 dark:border-purple-700">
             <h2 class="text-2xl font-semibold mb-3 text-purple-700 dark:text-purple-300">
-                🧠 Trợ Lý Học Tập AI (Chat & Phân Tích Hình Ảnh)
+                🧠 Trợ Lý Học Tập AI (Chat & Phân Tích Ảnh Dán)
             </h2>
             
             <p id="aiWarning" class="mb-3 text-sm font-semibold text-red-600 dark:text-red-400">
@@ -266,7 +292,7 @@
             <!-- Khung hiển thị Chat -->
             <div id="chatOutput" class="h-80 mb-3 flex flex-col space-y-3">
                 <div class="ai-message mr-auto">
-                    Chào bạn! Hãy nhập API Key để kích hoạt tôi. Tôi có thể trả lời câu hỏi và phân tích ảnh chụp màn hình bài giảng.
+                    Chào bạn! Hãy nhập API Key để kích hoạt tôi. Tôi có thể trả lời câu hỏi và phân tích ảnh bạn dán (Ctrl+V) vào ô chat.
                     <p class="message-timestamp">AI - ${new Date().toLocaleTimeString('vi-VN')}</p>
                 </div>
             </div>
@@ -288,25 +314,29 @@
         </div>
         
         
-        <!-- Khu vực Hiển thị Ảnh Chụp -->
-        <h2 class="text-2xl font-semibold mb-4 border-b pb-2">
-            Ảnh Chụp Ghi Chú Đã Lưu (Lưu Trữ Vĩnh Viễn)
-        </h2>
-        <div id="screenshotsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            <p id="loadingMessage" class="text-gray-500 italic col-span-full">
-                Đang tải ghi chú đã lưu...
-            </p>
-            <p id="noScreenshotsMessage" class="text-gray-500 italic col-span-full hidden">
-                Chưa có ảnh chụp nào được lưu.
-            </p>
+        <!-- Modal xem ảnh lớn -->
+        <div id="imageModal" class="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center hidden">
+            <div class="relative bg-white dark:bg-gray-800 p-4 rounded-lg max-w-4xl w-full mx-4">
+                <button id="closeModalButton" class="absolute top-2 right-2 text-gray-700 dark:text-gray-300 hover:text-red-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <img id="modalImage" src="" alt="Ảnh chụp ghi chú lớn" class="max-w-full max-h-[80vh] object-contain mx-auto" />
+                <div class="flex justify-center mt-4 space-x-4">
+                    <button id="downloadModalButton" class="btn-primary px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
+                        Tải Ảnh Xuống
+                    </button>
+                    <button id="deleteModalButton" class="btn-primary px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">
+                        Xóa Ảnh
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div class="mt-8 pt-4 border-t text-sm text-gray-500 dark:text-gray-400">
             <p>
-                *Lưu ý: Dữ liệu ảnh chụp (Ghi Chú) đã được lưu trữ an toàn trong Firestore Database.
-            </p>
-            <p>
-                **ID Người Dùng Hiện Tại (để lưu dữ liệu):** <span id="currentUserId" class="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-1 rounded">Đang tải...</span>
+                **ID Người Dùng Hiện Tại (để lưu video/chat):** <span id="currentUserId" class="font-mono text-xs bg-gray-100 dark:bg-gray-700 p-1 rounded">Đang tải...</span>
             </p>
         </div>
     </div>
@@ -314,9 +344,10 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, addDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection, query, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Cấu hình Firebase MANDATORY ---
+        // Giữ lại cấu hình Firebase mặc dù không dùng Firestore cho ảnh chụp
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -338,44 +369,50 @@
         let isRecording = false;
         let recognition = null; // Đối tượng Nhận dạng Giọng nói
         
-        // Biến Debounce cho chức năng Tự động Chụp
-        let lastAutoScreenshotTime = 0;
-        const AUTO_SCREENSHOT_COOLDOWN = 5000; // 5 giây cooldown sau mỗi lần tự chụp
-
-        // Biến lưu trữ ảnh dán/chụp màn hình để gửi AI
+        // Biến lưu trữ ảnh dán để gửi AI
         let pendingImageBase64 = null; 
+        
+        // Biến lưu trữ ảnh hiện đang mở trong modal
+        let currentModalScreenshotId = null; 
 
         // --- Lấy các phần tử DOM ---
         const statusMessage = document.getElementById('statusMessage');
         const screenPreview = document.getElementById('screenPreview');
         const noStreamMessage = document.getElementById('noStreamMessage');
         const screenshotCanvas = document.getElementById('screenshotCanvas');
-        const screenshotsContainer = document.getElementById('screenshotsContainer');
-        const noScreenshotsMessage = document.getElementById('noScreenshotsMessage');
-        const loadingMessage = document.getElementById('loadingMessage');
         const currentUserIdElement = document.getElementById('currentUserId');
         const themeToggleButton = document.getElementById('themeToggleButton');
         const sunIcon = document.getElementById('sunIcon');
         const moonIcon = document.getElementById('moonIcon');
         const transcriptPanel = document.getElementById('transcriptPanel');
         const studentNameInput = document.getElementById('studentName');
+        const screenshotsGrid = document.getElementById('screenshotsGrid');
+        const screenshotCount = document.getElementById('screenshotCount');
+        const noScreenshots = document.getElementById('noScreenshots');
         
-        // Phần tử mới cho API Key
+        // Phần tử API Key
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveApiKeyButton = document.getElementById('saveApiKeyButton');
         const apiKeyStatus = document.getElementById('apiKeyStatus');
         
-        // Phần tử mới cho AI Chat
+        // Phần tử AI Chat
         const chatOutput = document.getElementById('chatOutput');
         const chatTextInput = document.getElementById('chatTextInput');
         const sendQueryButton = document.getElementById('sendQueryButton');
         const pasteStatus = document.getElementById('pasteStatus');
         const aiWarning = document.getElementById('aiWarning');
         
+        // Modal xem ảnh
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const closeModalButton = document.getElementById('closeModalButton');
+        const downloadModalButton = document.getElementById('downloadModalButton');
+        const deleteModalButton = document.getElementById('deleteModalButton');
+        
         // Các nút điều khiển
         const startButton = document.getElementById('startButton');
-        const screenshotButton = document.getElementById('screenshotButton');
         const stopButton = document.getElementById('stopButton');
+        const takeScreenshotButton = document.getElementById('takeScreenshotButton');
         const downloadRecordingButton = document.getElementById('downloadRecordingButton');
 
         // --- CHỨC NĂNG API KEY ---
@@ -437,7 +474,6 @@
             }
         }
         
-        // Helper để chuyển đổi Data URL (base64) thành phần tử Gemini API
         function dataURLToGeminiPart(dataURL) {
             const parts = dataURL.split(';base64,');
             if (parts.length !== 2) return null;
@@ -454,11 +490,6 @@
             };
         }
 
-        /**
-         * Gửi truy vấn văn bản, có thể kèm theo ảnh màn hình, tới Gemini AI.
-         * @param {string} userQuery - Câu hỏi của người dùng.
-         * @param {string | null} imageBase64 - Base64 Data URL của ảnh chụp màn hình (tùy chọn).
-         */
         async function sendToAI(userQuery, imageBase64 = null) {
             
             if (!geminiApiKey) {
@@ -528,12 +559,10 @@
                 return generatedText.replace(/\n/g, '<br>') + sourceHTML;
 
             } catch (error) {
-                // Đảm bảo thông báo lỗi thân thiện hơn
                 console.error("Lỗi gọi API Gemini:", error);
                 
                 let errorMessage = `Lỗi: Không thể kết nối với AI để tạo câu trả lời. Vui lòng thử lại. Chi tiết lỗi: (${error.message})`;
                 
-                // Kiểm tra lỗi 403 (chưa cấp phép/sai key)
                 if (error.message.includes("403")) {
                      errorMessage = `Lỗi: Khóa API không hợp lệ. Vui lòng kiểm tra lại API Key đã nhập. Chi tiết: (${error.message})`;
                 }
@@ -542,12 +571,6 @@
             }
         }
         
-        /**
-         * Thêm tin nhắn vào giao diện Chat.
-         * @param {string} content - Nội dung tin nhắn (HTML).
-         * @param {string} sender - 'user' hoặc 'ai'.
-         * @param {string | null} imageBase64 - Ảnh Base64 (nếu có).
-         */
         function renderMessage(content, sender, imageBase64 = null) {
             const timeString = new Date().toLocaleTimeString('vi-VN');
             const messageDiv = document.createElement('div');
@@ -579,20 +602,16 @@
                 return;
             }
 
-            // Vô hiệu hóa input/buttons và hiển thị trạng thái tải
             chatTextInput.disabled = true;
             sendQueryButton.disabled = true;
             pasteStatus.classList.add('hidden');
             chatTextInput.classList.remove('has-pasted-image');
             
-            // Hiển thị tin nhắn người dùng (có thể kèm ảnh)
             renderMessage(userQuery || (imageBase64 ? '[Không có văn bản]' : ''), 'user', imageBase64);
             chatTextInput.value = '';
 
-            // Reset biến pending
             pendingImageBase64 = null;
 
-            // Thêm placeholder cho câu trả lời AI
             renderMessage('<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>AI đang xử lý...</span>', 'ai');
             const aiMessageElement = chatOutput.lastChild.querySelector('.ai-message p:first-child');
             
@@ -600,10 +619,8 @@
                 const aiResponse = await sendToAI(userQuery, imageBase64);
                 aiMessageElement.innerHTML = aiResponse;
             } catch (error) {
-                // Hiển thị lỗi fetch cuối cùng (nếu fetchRetry không bắt được lỗi)
                 aiMessageElement.innerHTML = `<span class="text-red-500">Lỗi: Không thể nhận phản hồi từ AI. Vui lòng thử lại.</span><p class="mt-1 text-xs text-red-400">Chi tiết: ${error.message}</p>`;
             } finally {
-                // Chỉ kích hoạt lại nếu đã có API key
                 if(geminiApiKey) {
                     chatTextInput.disabled = false;
                     sendQueryButton.disabled = false;
@@ -615,7 +632,6 @@
 
         // --- CHỨC NĂNG SÁNG / TỐI ---
         function initializeTheme() {
-            // Kiểm tra localStorage, mặc định là sáng
             const savedTheme = localStorage.getItem('theme') || 'light';
             if (savedTheme === 'dark') {
                 document.documentElement.classList.add('dark');
@@ -700,33 +716,6 @@
                      }, 1500);
                      updateStatus(`GIÁO VIÊN VỪA GỌI TÊN BẠN (${studentNameInput.value})!`, 'error');
                 }
-                
-                // --- TỰ ĐỘNG CHỤP MÀN HÌNH THEO GIỌNG NÓI ---
-                const isCopyCommand = currentText.includes('chép bài') || currentText.includes('ghi chép') || currentText.includes('ghi lại');
-                const now = Date.now();
-
-                if (isCopyCommand && (now - lastAutoScreenshotTime > AUTO_SCREENSHOT_COOLDOWN) && !screenshotButton.disabled) {
-                    lastAutoScreenshotTime = now;
-                    takeScreenshot(true); // Ghi chú: gọi với cờ saveToFirestore=true
-                    
-                    updateStatus(`[AUTO] Đã phát hiện lệnh "CHÉP BÀI" và TỰ ĐỘNG chụp màn hình.`, 'success');
-
-                    screenshotButton.classList.remove('bg-yellow-500', 'text-gray-900'); 
-                    screenshotButton.classList.add('animate-pulse', 'bg-green-500', 'text-white'); 
-                    
-                    setTimeout(() => {
-                        screenshotButton.classList.remove('animate-pulse', 'bg-green-500', 'text-white');
-                        screenshotButton.classList.add('bg-yellow-500', 'text-gray-900'); 
-                    }, 500);
-
-                } else if (isCopyCommand) {
-                     const remaining = Math.ceil((AUTO_SCREENSHOT_COOLDOWN - (now - lastAutoScreenshotTime)) / 1000);
-                     updateStatus(`Đã phát hiện lệnh "CHÉP BÀI" (Đang đợi Cooldown ${remaining}s)...`, 'info');
-                     screenshotButton.classList.add('ring-4', 'ring-yellow-500/50');
-                     setTimeout(() => {
-                        screenshotButton.classList.remove('ring-4', 'ring-yellow-500/50');
-                     }, 1000);
-                }
             };
 
             recognition.start();
@@ -739,7 +728,7 @@
             }
         }
         
-        // --- CHỨC NĂNG FIREBASE ---
+        // --- CHỨC NĂNG FIREBASE (CHỈ DÙNG CHO AUTH) ---
         async function initializeFirebase() {
             try {
                 const app = initializeApp(firebaseConfig);
@@ -758,97 +747,202 @@
                         currentUserIdElement.textContent = userId;
                         isAuthReady = true;
                         updateStatus('Đã kết nối với hệ thống lưu trữ. Sẵn sàng học tập!', 'success');
-                        loadScreenshotsFromFirestore();
+                        loadScreenshots(); // Tải ảnh chụp cục bộ
                     } else {
-                        // Tự động gán ID tạm thời nếu đăng nhập ẩn danh không thành công (rất hiếm)
                         userId = crypto.randomUUID(); 
                         currentUserIdElement.textContent = "Ẩn danh - " + userId.substring(0, 8) + '...';
                         isAuthReady = true;
-                        loadScreenshotsFromFirestore();
+                        loadScreenshots(); // Tải ảnh chụp cục bộ
                     }
                 });
 
             } catch (error) {
                 console.error("Lỗi khi khởi tạo Firebase:", error);
-                updateStatus(`Lỗi nghiêm trọng: Không thể kết nối Firestore. Ảnh chụp sẽ không được lưu.`, 'error');
+                updateStatus(`Lỗi nghiêm trọng: Không thể kết nối Firestore. Video sẽ không được lưu (nếu có logic lưu video).`, 'error');
             }
         }
-
-        function getCollectionPath() {
-            if (!userId) return null;
-            return `artifacts/${appId}/users/${userId}/screenshots`;
+        
+        // --- CHỨC NĂNG CHỤP VÀ QUẢN LÝ ẢNH (Dùng LocalStorage) ---
+        
+        /**
+         * Lấy danh sách ảnh chụp từ LocalStorage
+         * @returns {Array<Object>} Mảng các đối tượng { id: string, dataUrl: string, timestamp: number }
+         */
+        function loadScreenshots() {
+            const screenshotsJson = localStorage.getItem('screenshots');
+            let screenshots = screenshotsJson ? JSON.parse(screenshotsJson) : [];
+            
+            // Đảm bảo screenshots là một mảng
+            if (!Array.isArray(screenshots)) {
+                screenshots = [];
+            }
+            
+            renderScreenshots(screenshots);
+            return screenshots;
         }
 
-        function loadScreenshotsFromFirestore() {
-            if (!isAuthReady || !db || !userId) return;
+        /**
+         * Lưu danh sách ảnh chụp vào LocalStorage
+         * @param {Array<Object>} screenshots 
+         */
+        function saveScreenshots(screenshots) {
+            localStorage.setItem('screenshots', JSON.stringify(screenshots));
+            renderScreenshots(screenshots);
+        }
+        
+        /**
+         * Thêm một ảnh chụp mới.
+         * @param {string} dataUrl - Ảnh Base64
+         */
+        function addScreenshot(dataUrl) {
+            const screenshots = loadScreenshots();
+            const newScreenshot = {
+                id: crypto.randomUUID(),
+                dataUrl: dataUrl,
+                timestamp: Date.now()
+            };
+            screenshots.unshift(newScreenshot); // Thêm vào đầu để hiển thị mới nhất
+            saveScreenshots(screenshots);
+            updateStatus('Đã chụp và lưu ghi chú màn hình thành công!', 'success');
+        }
 
-            const path = getCollectionPath();
-            if (!path) return;
-            
-            const screenshotsCollection = collection(db, path);
-            const q = query(screenshotsCollection); 
+        /**
+         * Xóa một ảnh chụp theo ID.
+         * @param {string} screenshotId 
+         */
+        function deleteScreenshot(screenshotId) {
+            let screenshots = loadScreenshots();
+            screenshots = screenshots.filter(s => s.id !== screenshotId);
+            saveScreenshots(screenshots);
+            updateStatus('Đã xóa ảnh chụp ghi chú.', 'info');
+        }
 
-            onSnapshot(q, (snapshot) => {
-                const loadedScreenshots = [];
-                snapshot.forEach((doc) => {
-                    loadedScreenshots.push({
-                        id: doc.id,
-                        ...doc.data()
-                    });
+        /**
+         * Hiển thị danh sách ảnh chụp trên giao diện.
+         * @param {Array<Object>} screenshots 
+         */
+        function renderScreenshots(screenshots) {
+            screenshotsGrid.innerHTML = ''; // Xóa nội dung cũ
+            screenshotCount.textContent = screenshots.length;
+
+            if (screenshots.length === 0) {
+                noScreenshots.classList.remove('hidden');
+                return;
+            }
+            noScreenshots.classList.add('hidden');
+
+            screenshots.forEach(screenshot => {
+                const item = document.createElement('div');
+                item.className = 'screenshot-item group';
+                item.dataset.id = screenshot.id;
+
+                const img = document.createElement('img');
+                img.src = screenshot.dataUrl;
+                img.alt = `Ghi chú ${new Date(screenshot.timestamp).toLocaleTimeString('vi-VN')}`;
+                img.title = `Chụp lúc: ${new Date(screenshot.timestamp).toLocaleString('vi-VN')}`;
+                
+                // Mở modal khi click
+                img.addEventListener('click', () => openImageModal(screenshot));
+                
+                // Nút tải xuống nhỏ trên ảnh
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'absolute top-1 left-1 p-1 bg-green-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>';
+                downloadBtn.title = 'Tải xuống';
+                downloadBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Ngăn mở modal
+                    downloadDataUrl(screenshot.dataUrl, `GhiChu_${new Date(screenshot.timestamp).getTime()}.png`);
                 });
                 
-                loadedScreenshots.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+                // Nút xóa nhỏ trên ảnh
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>';
+                deleteBtn.title = 'Xóa';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Ngăn mở modal
+                    deleteScreenshot(screenshot.id);
+                });
 
-                renderScreenshots(loadedScreenshots);
-            }, (error) => {
-                console.error("Lỗi khi lắng nghe ảnh chụp:", error);
-                updateStatus('Lỗi tải ảnh chụp. Vui lòng kiểm tra console.', 'error');
+
+                item.appendChild(img);
+                item.appendChild(downloadBtn);
+                item.appendChild(deleteBtn);
+                screenshotsGrid.appendChild(item);
             });
         }
-
-        async function saveScreenshotToFirestore(dataUrl) {
-            if (!isAuthReady || !db || !userId) {
-                updateStatus('Lỗi: Chưa kết nối hệ thống lưu trữ.', 'error');
+        
+        /**
+         * Chuyển đổi luồng video thành ảnh và lưu vào local storage.
+         */
+        function takeScreenshot() {
+            if (!screenStream || !isRecording) {
+                updateStatus('Lỗi: Vui lòng Bắt Đầu Giám Sát trước khi chụp màn hình.', 'error');
                 return;
             }
 
-            const path = getCollectionPath();
-            if (!path) return;
-
-            try {
-                await addDoc(collection(db, path), {
-                    imageData: dataUrl,
-                    timestamp: new Date(),
-                });
-                // status được cập nhật bởi onSnapshot
-            } catch (error) {
-                console.error("Lỗi khi lưu ảnh chụp:", error);
-                updateStatus('Lỗi khi lưu ghi chú vào Database.', 'error');
+            const video = screenPreview;
+            const canvas = screenshotCanvas;
+            
+            // Thiết lập kích thước canvas bằng kích thước thực của video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            if (canvas.width === 0 || canvas.height === 0) {
+                 updateStatus('Lỗi: Video stream chưa sẵn sàng hoặc kích thước bằng 0.', 'error');
+                 return;
             }
-        }
-        
-        async function deleteScreenshotFromFirestore(screenshotId) {
-            if (!isAuthReady || !db || !userId) return;
 
-            const path = getCollectionPath();
-            if (!path) return;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            try {
-                await deleteDoc(doc(db, path, screenshotId));
-                updateStatus('Đã xóa ghi chú thành công.', 'info');
-            } catch (error) {
-                console.error("Lỗi khi xóa ảnh chụp:", error);
-                updateStatus('Lỗi khi xóa ghi chú.', 'error');
-            }
+            const dataUrl = canvas.toDataURL('image/png');
+            addScreenshot(dataUrl);
         }
-        
-        
-        // --- Chức năng Giao diện & Ghi hình ---
+
+        // --- Chức năng Modal Xem Ảnh Lớn ---
+
+        function openImageModal(screenshot) {
+            modalImage.src = screenshot.dataUrl;
+            imageModal.classList.remove('hidden');
+            currentModalScreenshotId = screenshot.id;
+            
+            // Cập nhật nút Download và Delete trong Modal
+            downloadModalButton.onclick = () => {
+                downloadDataUrl(screenshot.dataUrl, `GhiChu_${new Date(screenshot.timestamp).getTime()}.png`);
+            };
+            
+            deleteModalButton.onclick = () => {
+                deleteScreenshot(screenshot.id);
+                closeImageModal();
+            };
+        }
+
+        function closeModalButtonHandler() {
+            closeImageModal();
+        }
+
+        function closeImageModal() {
+            imageModal.classList.add('hidden');
+            modalImage.src = '';
+            currentModalScreenshotId = null;
+        }
+
+        // --- Chức năng Chung ---
+
+        function downloadDataUrl(dataUrl, filename) {
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
 
         function updateStatus(message, type = 'info') {
             statusMessage.textContent = message;
             
-            // Xóa tất cả các lớp Tailwind cho màu sắc/nền
             statusMessage.className = 'mb-4 p-3 text-sm rounded-lg';
 
             if (type === 'info') {
@@ -864,7 +958,6 @@
         async function startMonitoring() {
             updateStatus('Đang yêu cầu quyền chia sẻ màn hình và microphone...', 'info');
             try {
-                // Yêu cầu cả video và audio (cho microphone để nhận dạng giọng nói)
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 
                 if (!screenStream) {
@@ -891,7 +984,7 @@
                     downloadRecordingButton.disabled = false;
                     startButton.disabled = false;
                     stopButton.disabled = true;
-                    screenshotButton.disabled = true;
+                    takeScreenshotButton.disabled = true; // Tắt chụp khi dừng ghi
                 };
 
                 mediaRecorder.start(1000);
@@ -902,13 +995,12 @@
                     track.onended = stopMonitoring;
                 }
                 
-                // Bắt đầu nhận dạng giọng nói
                 startSpeechRecognition();
 
-                updateStatus('Đang Giám Sát và Ghi Hình. Tự động chụp khi nghe lệnh "chép bài".', 'success');
+                updateStatus('Đang Giám Sát và Ghi Hình. Nhấn (S) hoặc nút Chụp để lưu ghi chú.', 'success');
                 startButton.disabled = true;
                 stopButton.disabled = false;
-                screenshotButton.disabled = false;
+                takeScreenshotButton.disabled = false; // Bật chụp khi đang ghi
 
             } catch (err) {
                 console.error("Lỗi khi bắt đầu giám sát:", err);
@@ -928,7 +1020,7 @@
                 resetState();
             }
             
-            stopSpeechRecognition(); // Dừng nhận dạng giọng nói
+            stopSpeechRecognition();
             
             screenPreview.style.display = 'none';
             screenPreview.srcObject = null;
@@ -939,54 +1031,12 @@
             isRecording = false;
             startButton.disabled = false;
             stopButton.disabled = true;
-            screenshotButton.disabled = true;
-            downloadRecordingButton.disabled = true; // Đảm bảo nút download cũng tắt
+            takeScreenshotButton.disabled = true;
+            downloadRecordingButton.disabled = true; 
             updateStatus('Đã dừng giám sát. Vui lòng nhấn "Bắt Đầu" để học buổi mới.', 'info');
         }
 
-        /**
-         * Chụp màn hình và tùy chọn lưu vào Firestore.
-         * @param {boolean} saveToFirestore - Có lưu vào Firestore không. Mặc định là true.
-         * @returns {string | null} Data URL của ảnh chụp.
-         */
-        function takeScreenshot(saveToFirestore = true) {
-            if (!screenStream) {
-                // Nếu không chia sẻ màn hình, nhưng có yêu cầu chụp (thường là tự động hoặc phím S), thì bỏ qua.
-                if (!saveToFirestore) {
-                    // Nếu là chụp để gửi AI (saveToFirestore=false) và không có stream, KHÔNG thể chụp
-                    return null;
-                }
-                updateStatus('Lỗi: Bạn chưa bắt đầu chia sẻ màn hình.', 'error');
-                return null;
-            }
-            
-            if (screenPreview.readyState < 2) {
-                updateStatus('Video chưa sẵn sàng để chụp. Vui lòng đợi một chút.', 'error');
-                return null;
-            }
-            
-            const video = screenPreview;
-            const canvas = screenshotCanvas;
-            const context = canvas.getContext('2d');
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const imageDataUrl = canvas.toDataURL('image/png');
-            
-            if (saveToFirestore) {
-                // LƯU VÀO FIRESTORE
-                saveScreenshotToFirestore(imageDataUrl);
-            }
-            
-            return imageDataUrl;
-        }
-
-        // --- CHỨC NĂNG DÁN ẢNH ---
         function handlePaste(event) {
-            // Chỉ xử lý dán nếu AI đã được kích hoạt
             if(chatTextInput.disabled || !geminiApiKey) return;
             
             if (!event.clipboardData || !event.clipboardData.items) {
@@ -1000,18 +1050,17 @@
                     if (blob) {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            pendingImageBase64 = e.target.result; // Lưu trữ Data URL
+                            pendingImageBase64 = e.target.result;
                             chatTextInput.classList.add('has-pasted-image');
                             pasteStatus.classList.remove('hidden');
                         };
                         reader.readAsDataURL(blob);
-                        event.preventDefault(); // Ngăn dán văn bản ảnh vào input
+                        event.preventDefault(); 
                         return;
                     }
                 }
             }
             
-            // Xử lý dán văn bản (nếu người dùng dán văn bản sau khi dán ảnh)
             if (pendingImageBase64) {
                  setTimeout(() => {
                     pasteStatus.classList.add('hidden');
@@ -1022,7 +1071,6 @@
         
         function handleChatInputKeydown(event) {
             if (event.key !== 'Enter' && pendingImageBase64) {
-                // Nếu người dùng bắt đầu gõ chữ, loại bỏ hiệu ứng ảnh dán
                 chatTextInput.classList.remove('has-pasted-image');
                 pasteStatus.classList.add('hidden');
             }
@@ -1031,52 +1079,6 @@
                 event.preventDefault();
                 handleChatSubmission();
             }
-        }
-
-
-        function renderScreenshots(screenshots) {
-            screenshotsContainer.innerHTML = ''; // Xóa nội dung cũ
-            loadingMessage.classList.add('hidden');
-
-            if (screenshots.length === 0) {
-                noScreenshotsMessage.classList.remove('hidden');
-                return;
-            }
-            noScreenshotsMessage.classList.add('hidden');
-
-            screenshots.forEach(item => {
-                const now = item.timestamp ? item.timestamp.toDate() : new Date();
-                const timeString = now.toLocaleTimeString('vi-VN');
-                const dateString = now.toLocaleDateString('vi-VN');
-                
-                const card = document.createElement('div');
-                card.className = 'screenshot-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300 border border-gray-100 dark:border-gray-700';
-                card.innerHTML = `
-                    <button class="delete-btn p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition duration-150" data-id="${item.id}" aria-label="Xóa ảnh chụp">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                    <img src="${item.imageData}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b dark:opacity-90">
-                    <div class="p-3">
-                        <p class="text-xs font-medium text-indigo-600 dark:text-indigo-400">Ghi chú: ${dateString} ${timeString}</p>
-                        <a href="${item.imageData}" download="GhiChu_${item.id}.png" 
-                           class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 font-semibold transition duration-150">
-                            Tải Xuống (PNG)
-                        </a>
-                    </div>
-                `;
-                screenshotsContainer.appendChild(card);
-            });
-            
-            screenshotsContainer.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const id = e.currentTarget.dataset.id;
-                    if (id) {
-                        deleteScreenshotFromFirestore(id);
-                    }
-                });
-            });
         }
 
         function downloadRecording() {
@@ -1088,15 +1090,9 @@
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
             
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `BuoiHoc_${new Date().getTime()}.webm`;
-            document.body.appendChild(a);
-            a.click();
+            downloadDataUrl(url, `BuoiHoc_${new Date().getTime()}.webm`);
             
             window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
             
             updateStatus('Đã tạo liên kết tải xuống video. Vui lòng kiểm tra thư mục tải xuống.', 'success');
         }
@@ -1107,7 +1103,6 @@
             initializeTheme();
             themeToggleButton.addEventListener('click', toggleTheme);
             
-            // Cập nhật trạng thái API Key khi tải trang
             updateApiKeyStatus(); 
             saveApiKeyButton.addEventListener('click', saveApiKey);
             apiKeyInput.addEventListener('keydown', (e) => {
@@ -1116,40 +1111,39 @@
                  }
             });
 
-            // 1. Khởi tạo Firebase
+            // 1. Khởi tạo Firebase (chủ yếu cho Auth)
             initializeFirebase();
             
             // 2. Thiết lập các nút bấm chính
             startButton.addEventListener('click', startMonitoring);
             stopButton.addEventListener('click', stopMonitoring);
-            
-            // Nút Chụp Màn Hình Thủ Công
-            screenshotButton.addEventListener('click', () => takeScreenshot(true)); 
+            takeScreenshotButton.addEventListener('click', takeScreenshot);
             downloadRecordingButton.addEventListener('click', downloadRecording);
-
+            
             // 3. Thiết lập chức năng Chat AI 
             sendQueryButton.addEventListener('click', handleChatSubmission);
             chatTextInput.addEventListener('paste', handlePaste);
             chatTextInput.addEventListener('keydown', handleChatInputKeydown);
             chatTextInput.addEventListener('input', () => {
-                // Khi người dùng gõ/xóa, nếu không có ảnh pending, ẩn trạng thái dán
                 if (!pendingImageBase64) {
                     pasteStatus.classList.add('hidden');
                     chatTextInput.classList.remove('has-pasted-image');
                 }
             });
+            
+            // 4. Thiết lập Modal
+            closeModalButton.addEventListener('click', closeModalButtonHandler);
+            imageModal.addEventListener('click', (e) => {
+                 if (e.target === imageModal) {
+                    closeImageModal();
+                 }
+            });
 
-            // 4. Phím tắt (Hotkeys)
+            // 5. Phím tắt (Hotkey) cho Chụp Màn Hình
             document.addEventListener('keydown', (event) => {
-                if (event.key === 's' || event.key === 'S') {
-                    if (!screenshotButton.disabled) {
-                         event.preventDefault();
-                         takeScreenshot(true); // Gửi cờ saveToFirestore=true
-                         screenshotButton.classList.add('animate-pulse', 'bg-yellow-600');
-                         setTimeout(() => {
-                             screenshotButton.classList.remove('animate-pulse', 'bg-yellow-600');
-                         }, 200);
-                    }
+                if ((event.key === 's' || event.key === 'S') && isRecording) {
+                     event.preventDefault();
+                     takeScreenshot();
                 }
             });
             
