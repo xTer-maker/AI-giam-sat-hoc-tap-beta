@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công Cụ Ghi Màn Hình & Chụp Ghi Chú Học Tập</title>
+    <!-- Tải Tailwind CSS để tạo giao diện đẹp và responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        /* Ẩn video element ban đầu */
+        #screenPreview {
+            display: none;
+            width: 100%;
+            max-height: 50vh; /* Giới hạn chiều cao xem trước */
+        }
+        /* Tùy chỉnh nút */
+        .btn-primary {
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="container bg-white p-6 rounded-xl shadow-2xl border border-gray-100">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            Công Cụ Ghi Màn Hình Học Tập
+        </h1>
+        <p class="text-gray-600 mb-6">
+            Chọn màn hình để chia sẻ và bắt đầu ghi lại. Nhấn "Chụp Màn Hình" khi giáo viên yêu cầu ghi chú.
+        </p>
+
+        <!-- Thông báo Trạng thái -->
+        <div id="statusMessage" class="mb-4 p-3 text-sm rounded-lg text-blue-800 bg-blue-50 hidden">
+            Đang chờ bạn bắt đầu giám sát...
+        </div>
+
+        <!-- Vùng Xem Trước & Canvas Ẩn -->
+        <div class="relative mb-6 bg-gray-900 rounded-xl overflow-hidden shadow-inner">
+            <video id="screenPreview" autoplay muted class="rounded-xl"></video>
+            <canvas id="screenshotCanvas" class="hidden"></canvas>
+            <div id="noStreamMessage" class="flex items-center justify-center h-48 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1v-3m-6.447-2.83A7.995 7.995 0 0112 5a7.995 7.995 0 016.447 9.17l-3.21 1.605a.86.86 0 01-.894 0L12 15l-1.574.787a.86.86 0 01-.894 0L9.243 14.17z" />
+                </svg>
+                Chọn "Bắt Đầu" để chọn màn hình cần chia sẻ.
+            </div>
+        </div>
+
+        <!-- Khu vực Điều khiển -->
+        <div class="flex flex-wrap gap-4 mb-8 justify-center">
+            <button id="startButton" class="btn-primary px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                <span class="mr-2">▶️</span> Bắt Đầu Giám Sát
+            </button>
+            
+            <!-- Nút mô phỏng AI chụp màn hình khi có lệnh "Chép bài" -->
+            <button id="screenshotButton" class="btn-primary px-6 py-3 bg-yellow-500 text-gray-900 rounded-lg font-semibold hover:bg-yellow-600 disabled:opacity-50" disabled>
+                <span class="mr-2">📸</span> Chụp Màn Hình Ngay (Ghi Chú)
+            </button>
+            
+            <button id="stopButton" class="btn-primary px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:opacity-50" disabled>
+                <span class="mr-2">🛑</span> Dừng & Hoàn Thành
+            </button>
+            
+            <button id="downloadRecordingButton" class="btn-primary px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50" disabled>
+                <span class="mr-2">⬇️</span> Tải Video Ghi Lại
+            </button>
+        </div>
+
+        <!-- Khu vực Hiển thị Ảnh Chụp -->
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">
+            Ảnh Chụp Ghi Chú Đã Lưu
+        </h2>
+        <div id="screenshotsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <p id="noScreenshotsMessage" class="text-gray-500 italic col-span-full">
+                Chưa có ảnh chụp nào được lưu.
+            </p>
+        </div>
+
+        <div class="mt-8 pt-4 border-t text-sm text-gray-500">
+            <p>
+                *Lưu ý: Để có tính năng AI nhận diện giọng nói tiếng Việt tự động, cần có một dịch vụ máy chủ chuyên dụng. Phiên bản này sử dụng nút bấm thủ công để thay thế.
+            </p>
+            <p>
+                **Mẹo: Bạn có thể nhấn phím **'S'** để chụp màn hình nhanh thay vì nhấn nút.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Khai báo các biến toàn cục
+        let screenStream = null; // Luồng chia sẻ màn hình
+        let mediaRecorder = null; // Đối tượng ghi phương tiện
+        let recordedChunks = []; // Mảng chứa các đoạn dữ liệu video
+        let isRecording = false;
+        
+        // Lấy các phần tử DOM
+        const statusMessage = document.getElementById('statusMessage');
+        const screenPreview = document.getElementById('screenPreview');
+        const noStreamMessage = document.getElementById('noStreamMessage');
+        const screenshotCanvas = document.getElementById('screenshotCanvas');
+        const screenshotsContainer = document.getElementById('screenshotsContainer');
+        const noScreenshotsMessage = document.getElementById('noScreenshotsMessage');
+
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const screenshotButton = document.getElementById('screenshotButton');
+        const downloadRecordingButton = document.getElementById('downloadRecordingButton');
+
+        /**
+         * Hàm cập nhật trạng thái giao diện người dùng
+         * @param {string} message - Tin nhắn trạng thái
+         * @param {string} type - Loại thông báo (ví dụ: 'info', 'success', 'error')
+         */
+        function updateStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden', 'text-blue-800', 'bg-blue-50', 'text-red-800', 'bg-red-50', 'text-green-800', 'bg-green-50');
+            
+            if (type === 'info') {
+                statusMessage.classList.add('text-blue-800', 'bg-blue-50');
+            } else if (type === 'success') {
+                statusMessage.classList.add('text-green-800', 'bg-green-50');
+            } else if (type === 'error') {
+                statusMessage.classList.add('text-red-800', 'bg-red-50');
+            }
+        }
+
+        /**
+         * Bắt đầu giám sát (chia sẻ màn hình và ghi video)
+         */
+        async function startMonitoring() {
+            updateStatus('Đang yêu cầu quyền chia sẻ màn hình...', 'info');
+            try {
+                // Yêu cầu quyền chia sẻ màn hình
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true, 
+                    audio: true // Tùy chọn bao gồm cả âm thanh hệ thống
+                });
+                
+                if (!screenStream) {
+                    throw new Error("Người dùng đã hủy chia sẻ màn hình.");
+                }
+
+                screenPreview.srcObject = screenStream;
+                screenPreview.style.display = 'block';
+                noStreamMessage.classList.add('hidden');
+                
+                // Cài đặt Media Recorder
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(screenStream, { 
+                    mimeType: 'video/webm; codecs=vp8' 
+                });
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    isRecording = false;
+                    updateStatus('Hoàn thành ghi màn hình. Sẵn sàng để tải xuống.', 'success');
+                    downloadRecordingButton.disabled = false;
+                    startButton.disabled = false;
+                    stopButton.disabled = true;
+                    screenshotButton.disabled = true;
+                };
+
+                mediaRecorder.start(1000); // Ghi dữ liệu mỗi 1000ms
+                isRecording = true;
+
+                // Thiết lập lắng nghe khi người dùng dừng chia sẻ (nút Stop ở trình duyệt)
+                const track = screenStream.getVideoTracks()[0];
+                if (track) {
+                    track.onended = stopMonitoring;
+                }
+
+                updateStatus('Đang Giám Sát và Ghi Hình. Bấm "Chụp Màn Hình Ngay" để lưu ghi chú.', 'success');
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                screenshotButton.disabled = false;
+
+            } catch (err) {
+                console.error("Lỗi khi bắt đầu giám sát:", err);
+                updateStatus(`Lỗi: ${err.message || 'Không thể bắt đầu chia sẻ màn hình. Vui lòng thử lại.'}`, 'error');
+                resetState();
+            }
+        }
+
+        /**
+         * Dừng giám sát (dừng chia sẻ màn hình và ghi video)
+         */
+        function stopMonitoring() {
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+            }
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+            } else {
+                // Nếu dừng mà không có ghi hình (trường hợp lỗi)
+                resetState();
+            }
+            
+            screenPreview.style.display = 'none';
+            screenPreview.srcObject = null;
+            noStreamMessage.classList.remove('hidden');
+        }
+
+        /**
+         * Thiết lập lại trạng thái giao diện và biến
+         */
+        function resetState() {
+            isRecording = false;
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            screenshotButton.disabled = true;
+            updateStatus('Đã dừng giám sát. Vui lòng nhấn "Bắt Đầu" để học buổi mới.', 'info');
+        }
+
+        /**
+         * Chụp một khung hình từ luồng video đang chạy và hiển thị
+         */
+        function takeScreenshot() {
+            if (!screenStream) {
+                updateStatus('Lỗi: Bạn chưa bắt đầu chia sẻ màn hình.', 'error');
+                return;
+            }
+            
+            // Đảm bảo video đang có dữ liệu để vẽ
+            if (screenPreview.readyState < 2) {
+                updateStatus('Video chưa sẵn sàng để chụp. Vui lòng đợi một chút.', 'error');
+                return;
+            }
+            
+            const video = screenPreview;
+            const canvas = screenshotCanvas;
+            const context = canvas.getContext('2d');
+
+            // Thiết lập kích thước canvas bằng kích thước video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Vẽ khung hình hiện tại lên canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Chuyển canvas thành URL ảnh (base64)
+            const imageDataUrl = canvas.toDataURL('image/png');
+            
+            // Hiển thị ảnh chụp
+            displayScreenshot(imageDataUrl);
+            updateStatus('Đã chụp ghi chú thành công!', 'info');
+        }
+
+        /**
+         * Hiển thị ảnh chụp lên giao diện người dùng
+         * @param {string} dataUrl - Dữ liệu base64 của ảnh
+         */
+        function displayScreenshot(dataUrl) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('vi-VN');
+            
+            // Xóa thông báo "chưa có ảnh" nếu đây là ảnh đầu tiên
+            if (noScreenshotsMessage) {
+                 noScreenshotsMessage.classList.add('hidden');
+            }
+
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-[1.02] transition duration-300';
+            card.innerHTML = `
+                <img src="${dataUrl}" alt="Ảnh chụp ghi chú" class="w-full h-auto object-cover border-b">
+                <div class="p-3">
+                    <p class="text-xs font-medium text-indigo-600">Ghi chú lúc: ${timeString}</p>
+                    <a href="${dataUrl}" download="GhiChu_${now.getTime()}.png" 
+                       class="mt-2 inline-block text-sm text-green-600 hover:text-green-800 font-semibold transition duration-150">
+                        Tải Xuống (PNG)
+                    </a>
+                </div>
+            `;
+            screenshotsContainer.prepend(card); // Thêm ảnh chụp mới nhất lên đầu
+        }
+
+        /**
+         * Tải xuống video đã ghi lại
+         */
+        function downloadRecording() {
+            if (recordedChunks.length === 0) {
+                updateStatus('Không có dữ liệu video để tải xuống.', 'error');
+                return;
+            }
+
+            const blob = new Blob(recordedChunks, {
+                type: 'video/webm'
+            });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `BuoiHoc_${new Date().getTime()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Dọn dẹp
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            updateStatus('Đã tạo liên kết tải xuống video. Vui lòng kiểm tra thư mục tải xuống.', 'success');
+        }
+
+        // --- Thiết lập sự kiện ---
+        window.onload = function() {
+            // Thiết lập các nút bấm
+            startButton.addEventListener('click', startMonitoring);
+            stopButton.addEventListener('click', stopMonitoring);
+            screenshotButton.addEventListener('click', takeScreenshot);
+            downloadRecordingButton.addEventListener('click', downloadRecording);
+
+            // Phím tắt (Hotkeys)
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 's' || event.key === 'S') {
+                    if (!screenshotButton.disabled) {
+                         event.preventDefault(); // Ngăn chặn hành động mặc định của trình duyệt
+                         takeScreenshot();
+                         // Tăng thêm phản hồi thị giác
+                         screenshotButton.classList.add('animate-pulse');
+                         setTimeout(() => {
+                             screenshotButton.classList.remove('animate-pulse');
+                         }, 200);
+                    }
+                }
+            });
+            
+            updateStatus('Sẵn sàng. Nhấn "Bắt Đầu Giám Sát" để chọn màn hình học tập của bạn.', 'info');
+        }
+    </script>
+</body>
+</html>
