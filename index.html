@@ -176,14 +176,23 @@
             Đang chờ bạn bắt đầu giám sát...
         </div>
         
-        <!-- THÔNG BÁO API KEY ĐÃ CHÈN CỨNG -->
-        <div class="mb-6 p-4 rounded-lg border border-red-500 dark:border-red-700 bg-red-50 dark:bg-red-900/50">
-            <p class="text-sm font-bold text-red-800 dark:text-red-300">
-                ⚠️ CẢNH BÁO BẢO MẬT: Khóa API đã được chèn công khai vào mã nguồn. 
+        <!-- KHU VỰC NHẬP API KEY -->
+        <div class="mb-6 p-4 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/50">
+            <h3 class="text-lg font-semibold mb-2 text-indigo-700 dark:text-indigo-300">
+                🔑 Cấu hình Trợ lý AI (Bắt buộc)
+            </h3>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                Để sử dụng tính năng Chat và Phân tích Hình ảnh, bạn cần nhập **Khóa API Google Gemini** của mình. Khóa này được lưu cục bộ và không được chia sẻ.
             </p>
-            <p class="mt-1 text-xs text-red-700 dark:text-red-400">
-                **Khóa API của bạn (một phần):** <span id="displayedApiKey" class="font-mono bg-red-100 dark:bg-red-800 px-1 rounded text-red-900 dark:text-red-100"></span>.
-                Bất kỳ ai cũng có thể lấy khóa này, và bạn chịu trách nhiệm cho mọi chi phí phát sinh.
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <input type="password" id="apiKeyInput" placeholder="Nhập Gemini API Key của bạn (AIzaSy...)" 
+                    class="flex-grow p-2 border border-indigo-400 dark:border-indigo-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" />
+                <button id="saveApiKeyButton" class="btn-primary px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                    Lưu & Kích hoạt AI
+                </button>
+            </div>
+            <p id="apiKeyStatus" class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Trạng thái: Chưa có API Key.
             </p>
         </div>
 
@@ -250,14 +259,14 @@
                 🧠 Trợ Lý Học Tập AI (Chat & Phân Tích Hình Ảnh)
             </h2>
             
-            <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
-                Nhập câu hỏi, và <span class="font-bold">Ctrl+V (hoặc dán) ảnh chụp màn hình</span> vào ô bên dưới để gửi cho AI phân tích.
+            <p id="aiWarning" class="mb-3 text-sm font-semibold text-red-600 dark:text-red-400">
+                ⚠️ Tính năng AI bị TẮT. Vui lòng nhập API Key ở trên để kích hoạt.
             </p>
 
             <!-- Khung hiển thị Chat -->
             <div id="chatOutput" class="h-80 mb-3 flex flex-col space-y-3">
                 <div class="ai-message mr-auto">
-                    Chào bạn! Hãy hỏi tôi bất kỳ điều gì về nội dung đang học. Bạn cũng có thể dán ảnh chụp màn hình vào ô chat để tôi phân tích nhé.
+                    Chào bạn! Hãy nhập API Key để kích hoạt tôi. Tôi có thể trả lời câu hỏi và phân tích ảnh chụp màn hình bài giảng.
                     <p class="message-timestamp">AI - ${new Date().toLocaleTimeString('vi-VN')}</p>
                 </div>
             </div>
@@ -265,9 +274,9 @@
             <!-- Khu vực Nhập Chat -->
             <div class="flex items-center space-x-2">
                 <input type="text" id="chatTextInput" placeholder="Nhập câu hỏi của bạn (hoặc Ctrl+V để dán ảnh)..." 
-                    class="flex-grow p-3 border border-purple-400 dark:border-purple-600 rounded-lg focus:ring-purple-500 focus:border-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" />
+                    class="flex-grow p-3 border border-purple-400 dark:border-purple-600 rounded-lg focus:ring-purple-500 focus:border-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" disabled/>
                 
-                <button id="sendQueryButton" class="btn-primary flex items-center justify-center p-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50">
+                <button id="sendQueryButton" class="btn-primary flex items-center justify-center p-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50" disabled>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
@@ -317,14 +326,8 @@
         let userId = null;
         let isAuthReady = false;
         
-        // --- CẤU HÌNH API KEY (ĐÃ CHÈN CỨNG) ---
-        // Vui lòng LƯU Ý RỦI RO BẢO MẬT. Key này được hiển thị công khai.
-        const PUBLIC_API_KEY = "AIzaSyBK7MdXPKnKyC6a_6yTHmlAB-IPNOfdLcE"; 
-        let geminiApiKey = PUBLIC_API_KEY;
-
-        // Cập nhật thông báo rủi ro trên giao diện
-        document.getElementById('displayedApiKey').textContent = PUBLIC_API_KEY.substring(0, 15) + '...';
-
+        // --- CẤU HÌNH API KEY (LƯU TRONG LOCAL STORAGE) ---
+        let geminiApiKey = localStorage.getItem('geminiApiKey') || '';
 
         setLogLevel('Debug');
         
@@ -357,11 +360,17 @@
         const transcriptPanel = document.getElementById('transcriptPanel');
         const studentNameInput = document.getElementById('studentName');
         
+        // Phần tử mới cho API Key
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveApiKeyButton = document.getElementById('saveApiKeyButton');
+        const apiKeyStatus = document.getElementById('apiKeyStatus');
+        
         // Phần tử mới cho AI Chat
         const chatOutput = document.getElementById('chatOutput');
         const chatTextInput = document.getElementById('chatTextInput');
         const sendQueryButton = document.getElementById('sendQueryButton');
         const pasteStatus = document.getElementById('pasteStatus');
+        const aiWarning = document.getElementById('aiWarning');
         
         // Các nút điều khiển
         const startButton = document.getElementById('startButton');
@@ -369,6 +378,41 @@
         const stopButton = document.getElementById('stopButton');
         const downloadRecordingButton = document.getElementById('downloadRecordingButton');
 
+        // --- CHỨC NĂNG API KEY ---
+        function updateApiKeyStatus() {
+            if (geminiApiKey) {
+                apiKeyStatus.textContent = `Trạng thái: Đã kích hoạt AI. Khóa API đã được lưu an toàn.`;
+                apiKeyStatus.classList.remove('text-gray-600', 'dark:text-gray-400');
+                apiKeyStatus.classList.add('text-green-600', 'dark:text-green-400');
+                apiKeyInput.value = '';
+                
+                chatTextInput.disabled = false;
+                sendQueryButton.disabled = false;
+                aiWarning.classList.add('hidden');
+                
+            } else {
+                apiKeyStatus.textContent = `Trạng thái: Chưa có API Key. Tính năng AI đang bị TẮT.`;
+                apiKeyStatus.classList.remove('text-green-600', 'dark:text-green-400');
+                apiKeyStatus.classList.add('text-gray-600', 'dark:text-gray-400');
+                
+                chatTextInput.disabled = true;
+                sendQueryButton.disabled = true;
+                aiWarning.classList.remove('hidden');
+            }
+        }
+        
+        function saveApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (key.startsWith('AIzaSy') && key.length > 30) {
+                geminiApiKey = key;
+                localStorage.setItem('geminiApiKey', key);
+                updateApiKeyStatus();
+                updateStatus('Đã lưu API Key thành công! Trợ lý AI đã được kích hoạt.', 'success');
+            } else {
+                updateStatus('Lỗi: Khóa API không hợp lệ. Vui lòng kiểm tra lại.', 'error');
+                apiKeyInput.value = '';
+            }
+        }
 
         // --- CHỨC NĂNG LLM (Tạo Câu Trả Lời) ---
         async function fetchRetry(url, options, retries = 3) {
@@ -417,9 +461,8 @@
          */
         async function sendToAI(userQuery, imageBase64 = null) {
             
-            // Khóa đã được chèn cứng và gán cho geminiApiKey
             if (!geminiApiKey) {
-                return `<span class="text-red-500">Lỗi: Thiếu Khóa API. Khóa đã bị xóa hoặc không được tải.</span>`;
+                return `<span class="text-red-500">Lỗi: Thiếu Khóa API. Vui lòng nhập API Key để sử dụng tính năng này.</span>`;
             }
 
             const isImageQuery = !!imageBase64;
@@ -492,7 +535,7 @@
                 
                 // Kiểm tra lỗi 403 (chưa cấp phép/sai key)
                 if (error.message.includes("403")) {
-                     errorMessage = `Lỗi: Khóa API không hợp lệ hoặc hết hạn. Khóa API hiện tại có thể đã bị vô hiệu hóa do bị lộ công khai. Chi tiết: (${error.message})`;
+                     errorMessage = `Lỗi: Khóa API không hợp lệ. Vui lòng kiểm tra lại API Key đã nhập. Chi tiết: (${error.message})`;
                 }
 
                 return `<span class="text-red-500">${errorMessage}</span>`;
@@ -532,7 +575,7 @@
             }
             
             if (!geminiApiKey) {
-                renderMessage('<span class="text-red-500">Lỗi: Khóa API đã bị xóa hoặc không hợp lệ.</span>', 'ai');
+                renderMessage('<span class="text-red-500">Lỗi: Thiếu API Key. Vui lòng nhập API Key của bạn để sử dụng.</span>', 'ai');
                 return;
             }
 
@@ -560,8 +603,11 @@
                 // Hiển thị lỗi fetch cuối cùng (nếu fetchRetry không bắt được lỗi)
                 aiMessageElement.innerHTML = `<span class="text-red-500">Lỗi: Không thể nhận phản hồi từ AI. Vui lòng thử lại.</span><p class="mt-1 text-xs text-red-400">Chi tiết: ${error.message}</p>`;
             } finally {
-                chatTextInput.disabled = false;
-                sendQueryButton.disabled = false;
+                // Chỉ kích hoạt lại nếu đã có API key
+                if(geminiApiKey) {
+                    chatTextInput.disabled = false;
+                    sendQueryButton.disabled = false;
+                }
                 chatOutput.scrollTop = chatOutput.scrollHeight; 
             }
         }
@@ -714,7 +760,8 @@
                         updateStatus('Đã kết nối với hệ thống lưu trữ. Sẵn sàng học tập!', 'success');
                         loadScreenshotsFromFirestore();
                     } else {
-                        userId = crypto.randomUUID();
+                        // Tự động gán ID tạm thời nếu đăng nhập ẩn danh không thành công (rất hiếm)
+                        userId = crypto.randomUUID(); 
                         currentUserIdElement.textContent = "Ẩn danh - " + userId.substring(0, 8) + '...';
                         isAuthReady = true;
                         loadScreenshotsFromFirestore();
@@ -800,7 +847,6 @@
 
         function updateStatus(message, type = 'info') {
             statusMessage.textContent = message;
-            statusMessage.classList.remove('hidden', 'text-blue-800', 'bg-blue-50', 'text-red-800', 'bg-red-50', 'text-green-800', 'bg-green-50');
             
             // Xóa tất cả các lớp Tailwind cho màu sắc/nền
             statusMessage.className = 'mb-4 p-3 text-sm rounded-lg';
@@ -940,6 +986,9 @@
 
         // --- CHỨC NĂNG DÁN ẢNH ---
         function handlePaste(event) {
+            // Chỉ xử lý dán nếu AI đã được kích hoạt
+            if(chatTextInput.disabled || !geminiApiKey) return;
+            
             if (!event.clipboardData || !event.clipboardData.items) {
                 return;
             }
@@ -963,23 +1012,17 @@
             }
             
             // Xử lý dán văn bản (nếu người dùng dán văn bản sau khi dán ảnh)
-            // Nếu có pendingImageBase64, ẩn trạng thái ảnh dán đi
             if (pendingImageBase64) {
                  setTimeout(() => {
-                    // Cần delay một chút để cho phép dán văn bản hoàn tất
                     pasteStatus.classList.add('hidden');
                     chatTextInput.classList.remove('has-pasted-image');
-                    // Không xóa pendingImageBase64, vì ảnh dán đã được lưu lại
                  }, 10);
             }
         }
         
         function handleChatInputKeydown(event) {
-            // Khi người dùng bấm phím, có thể là họ đang gõ đè lên ảnh dán, reset trạng thái dán.
-            // Ngoại trừ phím Enter (vì Enter dùng để gửi)
-             if (event.key !== 'Enter' && pendingImageBase64) {
+            if (event.key !== 'Enter' && pendingImageBase64) {
                 // Nếu người dùng bắt đầu gõ chữ, loại bỏ hiệu ứng ảnh dán
-                // pendingImageBase64 vẫn được giữ lại để gửi cùng với văn bản mới
                 chatTextInput.classList.remove('has-pasted-image');
                 pasteStatus.classList.add('hidden');
             }
@@ -1064,6 +1107,15 @@
             initializeTheme();
             themeToggleButton.addEventListener('click', toggleTheme);
             
+            // Cập nhật trạng thái API Key khi tải trang
+            updateApiKeyStatus(); 
+            saveApiKeyButton.addEventListener('click', saveApiKey);
+            apiKeyInput.addEventListener('keydown', (e) => {
+                 if (e.key === 'Enter') {
+                    saveApiKey();
+                 }
+            });
+
             // 1. Khởi tạo Firebase
             initializeFirebase();
             
@@ -1075,7 +1127,7 @@
             screenshotButton.addEventListener('click', () => takeScreenshot(true)); 
             downloadRecordingButton.addEventListener('click', downloadRecording);
 
-            // 3. Thiết lập chức năng Chat AI (Bây giờ đã hỗ trợ Ctrl+V)
+            // 3. Thiết lập chức năng Chat AI 
             sendQueryButton.addEventListener('click', handleChatSubmission);
             chatTextInput.addEventListener('paste', handlePaste);
             chatTextInput.addEventListener('keydown', handleChatInputKeydown);
